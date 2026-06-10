@@ -46,4 +46,4 @@ Runnable and coherent as a first autonomous ICLR-style artifact. Not yet ready a
 
 ## GitHub repo URL
 
-Pending GitHub push.
+https://github.com/Jason-Wang313/best-of-n-3d-scene-world-models
