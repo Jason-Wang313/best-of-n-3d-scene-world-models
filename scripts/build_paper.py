@@ -20,7 +20,7 @@ def _replace_audit_line(prefix: str, value: str) -> None:
     text = AUDIT.read_text(encoding="utf-8")
     if prefix in text:
         text = text.replace(prefix, value)
-    else:
+    elif value not in text:
         text += "\n" + value + "\n"
     AUDIT.write_text(text, encoding="utf-8")
 

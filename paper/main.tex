@@ -1,12 +1,21 @@
-\documentclass[10pt]{article}
-\usepackage{iclr2026_conference}
+\documentclass{article}
+\usepackage{iclr2026_conference,times}
+\input{math_commands.tex}
 \usepackage{amsmath,amssymb}
+\usepackage{amsthm}
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{hyperref}
+\usepackage{url}
 \usepackage{xcolor}
 
 \title{Best-of-N Can Amplify Sparse-View Geometry Errors in 3D Scene World Models}
+
+\author{Anonymous Authors\\Paper under double-blind review}
+
+\newtheorem{proposition}{Proposition}
+\newcommand{\bon}{Best-of-$N$}
+\newcommand{\gap}{\mathrm{Gap}}
 
 \begin{document}
 \maketitle
@@ -120,11 +129,13 @@ the target visual hull excluding voxels visible from the proxy views.
 
 \section{Mechanism}
 
-\textbf{Proposition.} For a finite sparse set of projection views, there exist
-distinct 3D occupancies with identical proxy score and different true 3D IoU. If
-a sampler independently produces a proxy-dominating hidden-inconsistent
-candidate with probability $p>0$, then the probability that naive Best-of-N sees
-at least one such candidate is $1-(1-p)^N$.
+\begin{proposition}[Sparse-view Best-of-N amplification]
+For a finite sparse set of projection views, there exist distinct 3D
+occupancies with identical proxy score and different true 3D IoU. If a sampler
+independently produces a proxy-dominating hidden-inconsistent candidate with
+probability $p>0$, then the probability that naive Best-of-N sees at least one
+such candidate is $1-(1-p)^N$.
+\end{proposition}
 
 \textbf{Sketch.} Copy the first occupied voxel on every scored ray from a target
 scene. Any occupancy added or removed strictly behind those copied first hits
@@ -250,83 +261,83 @@ experiments.
 
 \begin{thebibliography}{20}
 
-\bibitem{mildenhall2020nerf}
+\bibitem[Mildenhall et~al.(2020)]{mildenhall2020nerf}
 Mildenhall, B., Srinivasan, P., Tancik, M., Barron, J., Ramamoorthi, R., and Ng, R.
 NeRF: Representing scenes as neural radiance fields for view synthesis. ECCV, 2020.
 
-\bibitem{sitzmann2019srn}
+\bibitem[Sitzmann et~al.(2019)]{sitzmann2019srn}
 Sitzmann, V., Zollhoefer, M., and Wetzstein, G.
 Scene representation networks: Continuous 3D-structure-aware neural scene representations. NeurIPS, 2019.
 
-\bibitem{yu2021pixelnerf}
+\bibitem[Yu et~al.(2021)]{yu2021pixelnerf}
 Yu, A., Ye, V., Tancik, M., and Kanazawa, A.
 pixelNeRF: Neural radiance fields from one or few images. CVPR, 2021.
 
-\bibitem{wang2021ibrnet}
+\bibitem[Wang et~al.(2021)]{wang2021ibrnet}
 Wang, Q., Wang, Z., Genova, K., Srinivasan, P., Zhou, H., Barron, J., Martin-Brualla, R., Snavely, N., and Funkhouser, T.
 IBRNet: Learning multi-view image-based rendering. CVPR, 2021.
 
-\bibitem{niemeyer2022regnerf}
+\bibitem[Niemeyer et~al.(2022)]{niemeyer2022regnerf}
 Niemeyer, M., Barron, J., Mildenhall, B., Sajjadi, M., Geiger, A., and Radwan, N.
 RegNeRF: Regularizing neural radiance fields for view synthesis from sparse inputs. CVPR, 2022.
 
-\bibitem{wang2023sparsenerf}
+\bibitem[Wang et~al.(2023)]{wang2023sparsenerf}
 Wang, G., Chen, Z., Loy, C., and Liu, Z.
 SparseNeRF: Distilling depth ranking for few-shot novel view synthesis. ICCV, 2023.
 
-\bibitem{kerbl2023gaussian}
+\bibitem[Kerbl et~al.(2023)]{kerbl2023gaussian}
 Kerbl, B., Kopanas, G., Leimkuehler, T., and Drettakis, G.
 3D Gaussian Splatting for real-time radiance field rendering. SIGGRAPH, 2023.
 
-\bibitem{guedon2024sugar}
+\bibitem[Guedon and Lepetit(2024)]{guedon2024sugar}
 Guedon, A. and Lepetit, V.
 SuGaR: Surface-aligned Gaussian Splatting for efficient 3D mesh reconstruction. CVPR, 2024.
 
-\bibitem{huang2024twodgs}
+\bibitem[Huang et~al.(2024)]{huang2024twodgs}
 Huang, B., Yu, Z., Chen, A., Geiger, A., and Gao, S.
 2D Gaussian Splatting for geometrically accurate radiance fields. SIGGRAPH, 2024.
 
-\bibitem{mescheder2019occupancy}
+\bibitem[Mescheder et~al.(2019)]{mescheder2019occupancy}
 Mescheder, L., Oechsle, M., Niemeyer, M., Nowozin, S., and Geiger, A.
 Occupancy Networks: Learning 3D reconstruction in function space. CVPR, 2019.
 
-\bibitem{peng2020convocc}
+\bibitem[Peng et~al.(2020)]{peng2020convocc}
 Peng, S., Niemeyer, M., Mescheder, L., Pollefeys, M., and Geiger, A.
 Convolutional Occupancy Networks. ECCV, 2020.
 
-\bibitem{cao2022monoscene}
+\bibitem[Cao and de~Charette(2022)]{cao2022monoscene}
 Cao, A. and de Charette, R.
 MonoScene: Monocular 3D semantic scene completion. CVPR, 2022.
 
-\bibitem{li2023voxformer}
+\bibitem[Li et~al.(2023)]{li2023voxformer}
 Li, Y., Yu, Z., Choy, C., Xiao, C., Alvarez, J., Fidler, S., Feng, C., and Anandkumar, A.
 VoxFormer: Sparse voxel transformer for camera-based 3D semantic scene completion. CVPR, 2023.
 
-\bibitem{zheng2024occworld}
+\bibitem[Zheng et~al.(2024)]{zheng2024occworld}
 Zheng, W. et al.
 OccWorld: Learning a 3D occupancy world model for autonomous driving. arXiv, 2024.
 
-\bibitem{guzman2012mcl}
+\bibitem[Guzman-Rivera et~al.(2012)]{guzman2012mcl}
 Guzman-Rivera, A., Batra, D., and Kohli, P.
 Multiple choice learning: Learning to produce multiple structured outputs. NeurIPS, 2012.
 
-\bibitem{bhattacharyya2018best}
+\bibitem[Bhattacharyya et~al.(2018)]{bhattacharyya2018best}
 Bhattacharyya, A., Fritz, M., and Schiele, B.
 Best-of-many samples objective for generative models. CVPR, 2018.
 
-\bibitem{cobbe2021verifiers}
+\bibitem[Cobbe et~al.(2021)]{cobbe2021verifiers}
 Cobbe, K., Kosaraju, V., Bavarian, M., Chen, M., Jun, H., Kaiser, L., Plappert, M., Tworek, J., Hilton, J., Nakano, R., Hesse, C., and Schulman, J.
 Training verifiers to solve math word problems. arXiv, 2021.
 
-\bibitem{lightman2023verify}
+\bibitem[Lightman et~al.(2023)]{lightman2023verify}
 Lightman, H. et al.
 Let's verify step by step. ICLR, 2023.
 
-\bibitem{laurentini1994visual}
+\bibitem[Laurentini(1994)]{laurentini1994visual}
 Laurentini, A.
 The visual hull concept for silhouette-based image understanding. IEEE TPAMI, 1994.
 
-\bibitem{kutulakos2000space}
+\bibitem[Kutulakos and Seitz(2000)]{kutulakos2000space}
 Kutulakos, K. and Seitz, S.
 A theory of shape by space carving. IJCV, 2000.
 
