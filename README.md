@@ -1,0 +1,55 @@
+# Best-of-N 3D Scene World Models
+
+This repository contains an anonymous first-pass ICLR-style research artifact
+studying Best-of-N inference for learned 3D / neural scene-representation world
+models.
+
+**Thesis.** In sparse-view 3D scene prediction, Best-of-N selection can amplify
+proxy-view errors: as `N` grows, a scorer that sees only a few projected views
+increasingly selects candidates that match those views while becoming less
+globally consistent in 3D. The repository demonstrates the mechanism on a
+deterministic synthetic voxel benchmark and tests a coverage/uncertainty-aware
+reranker.
+
+The code is intentionally CPU-friendly. It uses primitive voxel scenes, a
+simulated scene-world predictor, sparse orthographic proxy views, and explicit
+diagnostics for proxy fit, true 3D consistency, hidden-region error, diversity
+collapse, and geometric exploitation gap.
+
+## Quick Start
+
+```bash
+python -m pytest
+python experiments/run_synthetic.py --preset smoke --output results/smoke
+python experiments/run_synthetic.py --preset full --output results/full
+python scripts/build_paper.py
+```
+
+The paper build script writes:
+
+- `paper/final/iclr_submission.pdf`
+- `C:\Users\wangz\Downloads\best-of-n-3d-scene-world-models.pdf`
+
+## Repository Layout
+
+- `src/bon3d/`: benchmark, scoring, metrics, and plotting code.
+- `experiments/run_synthetic.py`: CLI for smoke and full experiments.
+- `tests/`: unit and smoke tests.
+- `docs/`: literature map, novelty decision, reviewer attacks, proof audit, and final audit.
+- `paper/`: anonymous ICLR-style LaTeX submission.
+- `results/`, `figures/`: generated tables and figures.
+
+## What the Synthetic Benchmark Models
+
+The benchmark is not a claim that real NeRF or Gaussian-splatting systems fail
+in exactly this toy way. It isolates a mechanism common to sparse-view scoring:
+many 3D volumes can share the same front-depth and silhouette projections.
+When a learned predictor samples multiple candidate scene futures, rare
+view-impostor candidates become more likely as `N` increases. A sparse proxy
+scorer can then prefer the impostor even when its hidden geometry is poor.
+
+The repair is deliberately modest: it keeps the same candidate set but reranks
+with proxy fit, ensemble geometry consensus, visual-hull volume plausibility,
+and surface-complexity penalties. This tests whether a cheap uncertainty and
+coverage signal can reduce proxy exploitation without needing ground-truth
+hidden geometry at test time.

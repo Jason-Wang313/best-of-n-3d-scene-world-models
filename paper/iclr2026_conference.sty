@@ -1,0 +1,29 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{iclr2026_conference}[2026/06/10 Minimal anonymous ICLR-style format]
+
+\RequirePackage[letterpaper,margin=1in]{geometry}
+\RequirePackage{times}
+\RequirePackage{fancyhdr}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Anonymous ICLR submission}
+\rhead{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.45em}
+\setlength{\textfloatsep}{10pt plus 2pt minus 2pt}
+\setlength{\floatsep}{8pt plus 2pt minus 2pt}
+\setlength{\intextsep}{8pt plus 2pt minus 2pt}
+
+\makeatletter
+\renewcommand{\maketitle}{%
+  \begin{center}
+    {\Large\bfseries \@title \par}
+    \vskip 0.75em
+    {\normalsize Anonymous authors\\Paper under double-blind review}
+  \end{center}
+  \vskip 0.5em
+}
+\makeatother
