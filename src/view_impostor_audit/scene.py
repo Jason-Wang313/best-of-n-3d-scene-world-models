@@ -7,7 +7,7 @@ from typing import Iterable
 
 import numpy as np
 
-from bon3d.geometry import (
+from view_impostor_audit.geometry import (
     behind_front_mask,
     dilate_once,
     normalize_axes,

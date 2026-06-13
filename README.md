@@ -1,12 +1,12 @@
-# Best-of-N 3D Scene World Models
+# View-Impostor Audits for 3D Scene World Models
 
-This repository contains an anonymous first-pass ICLR-style research artifact
-studying Best-of-N inference for learned 3D / neural scene-representation world
+This repository contains an anonymous ICLR-style research artifact studying
+view-impostor failures in learned 3D / neural scene-representation world
 models.
 
-**Thesis.** In sparse-view 3D scene prediction, Best-of-N selection can amplify
-proxy-view errors: as `N` grows, a scorer that sees only a few projected views
-increasingly selects candidates that match those views while becoming less
+**Thesis.** In sparse-view 3D scene prediction, larger candidate pools can
+amplify proxy-view errors: as `N` grows, a scorer that sees only a few projected
+views increasingly selects candidates that match those views while becoming less
 globally consistent in 3D. The repository demonstrates the mechanism on a
 deterministic synthetic voxel benchmark and tests a coverage/uncertainty-aware
 reranker.
@@ -28,15 +28,15 @@ python scripts/build_paper.py
 The paper build script writes:
 
 - `paper/final/iclr_submission.pdf`
-- `C:\Users\wangz\Downloads\best-of-n-3d-scene-world-models.pdf`
+- `C:\Users\wangz\OneDrive\Desktop\best-of-n-3d-scene-world-models-v2.pdf`
 
 ## Repository Layout
 
-- `src/bon3d/`: benchmark, scoring, metrics, and plotting code.
+- `src/view_impostor_audit/`: benchmark, scoring, metrics, and plotting code.
 - `experiments/run_synthetic.py`: CLI for smoke and full experiments.
 - `tests/`: unit and smoke tests.
 - `docs/`: literature map, novelty decision, reviewer attacks, proof audit, and final audit.
-- `paper/`: anonymous ICLR-style LaTeX submission.
+- `paper/`: anonymous LaTeX submission.
 - `results/`, `figures/`: generated tables and figures.
 
 ## What the Synthetic Benchmark Models

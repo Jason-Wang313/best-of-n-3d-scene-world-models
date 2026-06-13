@@ -1,4 +1,4 @@
-"""Experiment orchestration for the Best-of-N 3D scene benchmark."""
+"""Experiment orchestration for the view-impostor audit benchmark."""
 
 from __future__ import annotations
 
@@ -10,10 +10,10 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 
-from bon3d.metrics import evaluate_selection
-from bon3d.plotting import plot_example, plot_hidden_and_diversity, plot_tradeoff
-from bon3d.scene import generate_scene, sample_candidates
-from bon3d.scoring import score_candidates, select_index
+from view_impostor_audit.metrics import evaluate_selection
+from view_impostor_audit.plotting import plot_example, plot_hidden_and_diversity, plot_tradeoff
+from view_impostor_audit.scene import generate_scene, sample_candidates
+from view_impostor_audit.scoring import score_candidates, select_index
 
 
 @dataclass(frozen=True)
@@ -128,7 +128,7 @@ def run_experiment(
     summary.to_csv(summary_path, index=False)
     trace.to_csv(trace_path, index=False)
 
-    tradeoff_path = figures_path / "bon_tradeoff.png"
+    tradeoff_path = figures_path / "impostor_tradeoff.png"
     hidden_path = figures_path / "hidden_diversity.png"
     plot_tradeoff(summary, tradeoff_path)
     plot_hidden_and_diversity(summary, hidden_path)

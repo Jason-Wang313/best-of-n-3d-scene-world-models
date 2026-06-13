@@ -7,11 +7,11 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from bon3d.experiment import PRESETS, ExperimentConfig, run_experiment
+from view_impostor_audit.experiment import PRESETS, ExperimentConfig, run_experiment
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run the synthetic Best-of-N 3D scene benchmark.")
+    parser = argparse.ArgumentParser(description="Run the synthetic view-impostor 3D scene benchmark.")
     parser.add_argument("--preset", choices=sorted(PRESETS), default="smoke")
     parser.add_argument("--output", type=Path, default=Path("results/smoke"))
     parser.add_argument("--seed", type=int, default=None)

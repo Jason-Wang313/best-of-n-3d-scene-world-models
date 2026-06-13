@@ -3,10 +3,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from bon3d.experiment import ExperimentConfig, run_experiment
-from bon3d.geometry import iou, project_silhouette, visible_mask, visual_hull_from_scene
-from bon3d.scene import generate_scene, sample_candidates
-from bon3d.scoring import proxy_score, score_candidates, select_index
+from view_impostor_audit.experiment import ExperimentConfig, run_experiment
+from view_impostor_audit.geometry import iou, project_silhouette, visible_mask, visual_hull_from_scene
+from view_impostor_audit.scene import generate_scene, sample_candidates
+from view_impostor_audit.scoring import proxy_score, score_candidates, select_index
 
 
 def test_scene_generation_is_reproducible() -> None:

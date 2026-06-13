@@ -6,15 +6,15 @@
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{hyperref}
+\hypersetup{hidelinks}
 \usepackage{url}
 \usepackage{xcolor}
 
-\title{Best-of-N Can Amplify Sparse-View Geometry Errors in 3D Scene World Models}
+\title{View-Impostor Audits for Sparse-View\\3D Scene World Models}
 
 \author{Anonymous Authors\\Paper under double-blind review}
 
 \newtheorem{proposition}{Proposition}
-\newcommand{\bon}{Best-of-$N$}
 \newcommand{\gap}{\mathrm{Gap}}
 
 \begin{document}
@@ -22,37 +22,38 @@
 
 \begin{abstract}
 Learned 3D scene world models increasingly represent futures as neural fields,
-Gaussian splats, point clouds, or occupancy volumes. A common inference pattern
-is to sample multiple candidate futures and select the candidate with the best
-proxy score. This paper studies a narrow failure mode of that pattern: when the
-proxy observes only sparse views, Best-of-N selection can prefer candidates that
-match the scored views while becoming less consistent in hidden 3D regions. We
-build a deterministic synthetic voxel benchmark that isolates the mechanism.
-Naive sparse-view Best-of-N improves proxy score from 0.791 at $N=1$ to 1.000
-at $N=64$, but true 3D IoU falls from 0.520 to 0.340 and hidden-region error
-rises from 0.442 to 0.929. A simple reranker using ensemble geometry consensus,
+Gaussian splats, point clouds, or occupancy volumes. Their deployment interface
+often samples several candidate futures and keeps the one with the strongest
+sparse-view proxy score. This paper audits a specific geometry failure in that
+interface. Sparse projective scores can be blind to hidden occupancy, so larger
+candidate pools make it easier to find a view impostor: a scene that matches
+the scored views while disagreeing with unobserved 3D structure. We build a
+deterministic voxel benchmark that exposes this mechanism. The naive
+sparse-view selector raises proxy score from 0.791 at $N=1$ to 1.000 at
+$N=64$, while true 3D IoU falls from 0.520 to 0.340 and hidden-region error
+rises from 0.442 to 0.929. A reranker using ensemble geometry consensus,
 visual-hull volume plausibility, and surface-complexity penalties recovers much
-of the hidden geometry, reaching 0.888 true IoU at $N=16$. The result is not a
-claim that all neural scene models fail this way; it is a runnable diagnostic
-for an under-tested interaction between sparse projective scoring and
-multi-sample inference.
+of the hidden geometry, reaching 0.888 true IoU at $N=16$. The contribution is
+a scoped audit protocol for candidate scene-world models, not a universal claim
+about all neural renderers.
 \end{abstract}
 
 \section{Introduction}
 
-Best-of-N inference is attractive for world models: sample several plausible
-future scenes, score them with a task proxy, and execute or report the best. In
-3D scene representations this proxy often comes from sparse observations:
-rendered views, depth maps, partial point clouds, or task-relevant camera rays.
-The proxy is cheaper and more available than full 3D ground truth, but it is not
-injective. Many different 3D scenes can share the same silhouettes and visible
-front surfaces.
+Candidate scene inference is attractive for world models: sample several
+plausible future scenes, score them with a task proxy, and execute or report
+the best. In 3D scene representations this proxy often comes from sparse
+observations: rendered views, depth maps, partial point clouds, or
+task-relevant camera rays. The proxy is cheaper and more available than full 3D
+ground truth, but it is not injective. Many different 3D scenes can share the
+same silhouettes and visible front surfaces.
 
-This paper asks what happens when that ambiguity meets Best-of-N selection. The
-answer in our controlled benchmark is uncomfortable: increasing $N$ can make the
-selected candidate look better under the sparse proxy while making it worse as a
-3D scene. The selector finds rare view impostors. These candidates are excellent
-under the scored views and poor in hidden regions.
+This paper asks what happens when that ambiguity becomes a selection interface.
+The answer in our controlled benchmark is uncomfortable: increasing the number
+of sampled candidates can make the selected scene look better under the sparse
+proxy while making it worse as a 3D scene. The selector finds rare view
+impostors. These candidates are excellent under the scored views and poor in
+hidden regions.
 
 Our contribution is a mechanism-specific diagnostic rather than a new renderer:
 
@@ -64,7 +65,7 @@ Our contribution is a mechanism-specific diagnostic rather than a new renderer:
   selected-candidate diversity, view-impostor rate, and the geometric
   exploitation gap;
   \item a construction-level proposition showing why sparse-view equivalence
-  enables N-dependent amplification;
+  enables candidate-pool amplification;
   \item a simple coverage-aware reranker that reduces the exploitation gap in
   the benchmark without accessing hidden ground truth.
 \end{itemize}
@@ -79,7 +80,8 @@ study how to represent or infer scenes from limited views. Gaussian Splatting
 \cite{kerbl2023gaussian} and follow-up geometry-aware splatting methods such as
 SuGaR \cite{guedon2024sugar} and 2DGS \cite{huang2024twodgs} provide explicit,
 fast renderable scene representations. These papers motivate the architecture
-class, but they do not isolate Best-of-N selection over candidate scene futures.
+class, but they do not isolate sparse-view candidate selection over scene
+futures.
 
 \textbf{Occupancy and scene world models.} Occupancy Networks
 \cite{mescheder2019occupancy}, Convolutional Occupancy Networks
@@ -90,7 +92,7 @@ hidden-region error directly measurable; the question is not how to build the
 best occupancy predictor, but how a sparse proxy behaves when choosing among
 multiple predicted occupancies.
 
-\textbf{Best-of-N and proxy overoptimization.} Multi-hypothesis prediction and
+\textbf{Candidate selection and proxy overoptimization.} Multi-hypothesis prediction and
 best-of-many objectives \cite{guzman2012mcl,bhattacharyya2018best} encourage
 diverse outputs. Reward and verifier literature shows that selecting against an
 imperfect proxy can overoptimize that proxy \cite{cobbe2021verifiers,
@@ -100,8 +102,8 @@ ambiguity: sparse views create equivalence classes of hidden geometry.
 \textbf{Classical multiview geometry.} Visual hull and space-carving results
 \cite{laurentini1994visual,kutulakos2000space} already show that sparse views
 underdetermine shape. We use this as the mechanism, not as a novelty claim. The
-new empirical question is how often Best-of-N selection finds such ambiguous
-impostors as $N$ grows.
+new empirical question is how often sparse-view candidate selection finds such
+ambiguous impostors as the candidate pool grows.
 
 \section{Benchmark}
 
@@ -129,12 +131,12 @@ the target visual hull excluding voxels visible from the proxy views.
 
 \section{Mechanism}
 
-\begin{proposition}[Sparse-view Best-of-N amplification]
+\begin{proposition}[View-impostor amplification]
 For a finite sparse set of projection views, there exist distinct 3D
 occupancies with identical proxy score and different true 3D IoU. If a sampler
 independently produces a proxy-dominating hidden-inconsistent candidate with
-probability $p>0$, then the probability that naive Best-of-N sees at least one
-such candidate is $1-(1-p)^N$.
+probability $p>0$, then the probability that a sparse-view selector sees at
+least one such candidate among $N$ samples is $1-(1-p)^N$.
 \end{proposition}
 
 \textbf{Sketch.} Copy the first occupied voxel on every scored ray from a target
@@ -167,8 +169,8 @@ occupancy. No term uses hidden ground-truth voxels.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{../figures/bon_tradeoff.png}
-  \caption{Naive Best-of-N improves the sparse proxy while reducing true 3D
+  \includegraphics[width=\linewidth]{../figures/impostor_tradeoff.png}
+  \caption{Naive sparse-view selection improves the proxy while reducing true 3D
   consistency. The coverage-aware reranker trades a small amount of proxy score
   for much better 3D IoU and lower exploitation gap.}
   \label{fig:tradeoff}
@@ -196,9 +198,9 @@ repaired & 64 & 0.978 & 0.851 & 0.183 & 0.127 \\
 \end{table}
 
 The headline result is the divergence between proxy and true 3D consistency.
-For naive Best-of-N, proxy score reaches 1.000 at $N=32$ and $N=64$, while true
-IoU falls to 0.340. Hidden-region error rises to 0.929. The selected candidate
-is a view impostor in 100\% of scenes at $N=32$ and $N=64$.
+For the naive sparse-view selector, proxy score reaches 1.000 at $N=32$ and
+$N=64$, while true IoU falls to 0.340. Hidden-region error rises to 0.929. The
+selected candidate is a view impostor in 100\% of scenes at $N=32$ and $N=64$.
 
 The repair is not perfect, but it targets the mechanism. It reaches 0.888 true
 IoU at $N=16$ and keeps the exploitation gap at 0.074. At $N=64$, the repair
@@ -235,12 +237,14 @@ generator and evaluate with held-out 3D reconstructions or multi-view captures.
 
 The repository contains deterministic seeds, tests, smoke and full presets, CSV
 tables, and generated figures. The main commands are:
+{\footnotesize
 \begin{verbatim}
 python -m pytest
 python experiments/run_synthetic.py --preset smoke --output results/smoke
 python experiments/run_synthetic.py --preset full --output results/full
 python scripts/build_paper.py
 \end{verbatim}
+}
 
 \section{ICLR Checklist}
 

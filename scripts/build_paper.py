@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PAPER_DIR = ROOT / "paper"
 FINAL_DIR = PAPER_DIR / "final"
 FINAL_PDF = FINAL_DIR / "iclr_submission.pdf"
-DOWNLOAD_PDF = Path.home() / "Downloads" / "best-of-n-3d-scene-world-models.pdf"
+DESKTOP_PDF = Path.home() / "OneDrive" / "Desktop" / "best-of-n-3d-scene-world-models-v2.pdf"
 AUDIT = ROOT / "docs" / "final_audit.md"
 
 
@@ -47,7 +47,7 @@ def main() -> int:
                 )
                 (FINAL_DIR / "build_failure.txt").write_text(failure, encoding="utf-8")
                 _replace_audit_line(
-                    "Pending build: `C:\\Users\\wangz\\Downloads\\best-of-n-3d-scene-world-models.pdf`",
+                    "Pending build: `C:\\Users\\wangz\\OneDrive\\Desktop\\best-of-n-3d-scene-world-models-v2.pdf`",
                     "Build failed; see `paper/final/build_failure.txt`.",
                 )
                 print(failure)
@@ -61,7 +61,7 @@ def main() -> int:
         )
         (FINAL_DIR / "build_failure.txt").write_text(failure, encoding="utf-8")
         _replace_audit_line(
-            "Pending build: `C:\\Users\\wangz\\Downloads\\best-of-n-3d-scene-world-models.pdf`",
+            "Pending build: `C:\\Users\\wangz\\OneDrive\\Desktop\\best-of-n-3d-scene-world-models-v2.pdf`",
             "Build failed; see `paper/final/build_failure.txt`.",
         )
         print(failure)
@@ -75,13 +75,14 @@ def main() -> int:
         return 1
 
     shutil.copyfile(built, FINAL_PDF)
-    shutil.copyfile(built, DOWNLOAD_PDF)
+    DESKTOP_PDF.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(built, DESKTOP_PDF)
     _replace_audit_line(
-        "Pending build: `C:\\Users\\wangz\\Downloads\\best-of-n-3d-scene-world-models.pdf`",
-        "`C:\\Users\\wangz\\Downloads\\best-of-n-3d-scene-world-models.pdf`",
+        "Pending build: `C:\\Users\\wangz\\OneDrive\\Desktop\\best-of-n-3d-scene-world-models-v2.pdf`",
+        "`C:\\Users\\wangz\\OneDrive\\Desktop\\best-of-n-3d-scene-world-models-v2.pdf`",
     )
     print(f"wrote {FINAL_PDF}")
-    print(f"wrote {DOWNLOAD_PDF}")
+    print(f"wrote {DESKTOP_PDF}")
     return 0
 
 

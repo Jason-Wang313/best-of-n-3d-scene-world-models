@@ -1,6 +1,6 @@
 # Literature Map
 
-This map records the autonomous first-pass literature sweep used to choose the paper angle. The linked CSV contains 139 entries with title, year, venue or arXiv source, link, cluster, contribution, relevance score, threat level, and a short subsumption judgment.
+This map records the literature sweep used to choose the paper angle. The linked CSV contains 139 entries with title, year, venue or arXiv source, link, cluster, contribution, relevance score, threat level, and a short subsumption judgment.
 
 ## Sweep Structure
 
@@ -10,7 +10,7 @@ The 100-paper landscape sweep was organized into six clusters:
 2. Gaussian and explicit scene representations: 3D Gaussian Splatting, dynamic 3DGS, Gaussian SLAM, geometry-aware splatting, and generative Gaussian scenes.
 3. Occupancy, point cloud, and scene-completion world models: occupancy networks, convolutional occupancy networks, point-cloud transformers, semantic scene completion, and autonomous-driving occupancy world models.
 4. Generative and latent world models: PlaNet, Dreamer, MuZero, TD-MPC, Genie, driving video world models, and neural simulators.
-5. Best-of-N, multi-hypothesis, decoding, and proxy-selection literature: multiple choice learning, best-of-many objectives, beam search, verifier-guided selection, reward overoptimization, and CEM-style selection.
+5. Candidate-pool, multi-hypothesis, decoding, and proxy-selection literature: multiple choice learning, best-of-many objectives, beam search, verifier-guided selection, reward overoptimization, and CEM-style selection.
 6. Multiview geometry and uncertainty: visual hulls, space carving, differentiable rendering, calibration, and ensemble uncertainty.
 
 ## 30-Paper Serious Skim Set
@@ -31,19 +31,19 @@ The closest deep-read targets are the ones a reviewer would cite to attack novel
 - Sparse-view reconstruction and regularization: RegNeRF, SparseNeRF, MVSNeRF, DietNeRF, MonoScene, VoxFormer.
 - Modern scene-world models: OccWorld, DriveWorld, GAIA-1, DriveDreamer, VISTA, Generative Gaussian Splatting.
 - Geometry ambiguity foundations: visual hulls, space carving, differentiable volumetric rendering.
-- Selection and proxy overoptimization: Best-of-Many Samples, Multiple Choice Learning, Reward Model Ensembles, verifier-guided Best-of-N, CEM/PETS.
+- Selection and proxy overoptimization: Best-of-Many Samples, Multiple Choice Learning, Reward Model Ensembles, verifier-guided candidate selection, CEM/PETS.
 - Uncertainty repair ingredients: Deep Ensembles, calibration, epistemic/aleatoric uncertainty.
 
 ## What the Sweep Changed
 
-The initial broad topic could have gone toward a new 3D representation, a new world-model architecture, or a theorem about Best-of-N. The literature made those options weak for a first autonomous pass:
+The initial broad topic could have gone toward a new 3D representation, a new world-model architecture, or a theorem about generic candidate selection. The literature made those options weak:
 
 - New 3D representations are crowded and require real rendering benchmarks.
 - Sparse-view regularizers are well studied; claiming a generic fix would be easy to dismiss.
 - Classical visual hull literature already proves sparse-view ambiguity, so the novelty cannot be "sparse views are ambiguous."
-- Reward overoptimization literature already says optimizing a proxy can fail, so the novelty cannot be "Best-of-N overfits a proxy."
+- Reward overoptimization literature already says optimizing a proxy can fail, so the novelty cannot be "candidate selection overfits a proxy."
 
-The defensible center is narrower: **in learned 3D scene-world candidate selection, Best-of-N can turn sparse-view ambiguity into an N-dependent geometric failure mode.** The contribution is a mechanism-specific diagnostic and a small repair, not a universal method.
+The defensible center is narrower: **in learned 3D scene-world candidate selection, candidate-pool pressure can turn sparse-view ambiguity into a view-impostor failure mode.** The contribution is a mechanism-specific diagnostic and a small repair, not a universal method.
 
 ## Chosen Angle
 

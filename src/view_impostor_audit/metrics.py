@@ -6,9 +6,9 @@ from typing import Iterable, Sequence
 
 import numpy as np
 
-from bon3d.geometry import iou, pairwise_diversity, surface_fraction, visible_mask, visual_hull_from_scene
-from bon3d.scene import Candidate
-from bon3d.scoring import CandidateScore
+from view_impostor_audit.geometry import iou, pairwise_diversity, surface_fraction, visible_mask, visual_hull_from_scene
+from view_impostor_audit.scene import Candidate
+from view_impostor_audit.scoring import CandidateScore
 
 
 def hidden_region_mask(target: np.ndarray, axes: Iterable[str]) -> np.ndarray:

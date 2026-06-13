@@ -7,7 +7,7 @@ from typing import Iterable, Sequence
 
 import numpy as np
 
-from bon3d.geometry import (
+from view_impostor_audit.geometry import (
     front_depth,
     iou,
     normalize_axes,
@@ -15,7 +15,7 @@ from bon3d.geometry import (
     surface_fraction,
     visual_hull_from_scene,
 )
-from bon3d.scene import Candidate
+from view_impostor_audit.scene import Candidate
 
 
 @dataclass(frozen=True)

@@ -32,9 +32,9 @@
 
 **Answer:** Correct. True IoU is an evaluation diagnostic, not a deployment signal. The deployable part is the reranker; the benchmark uses true IoU to show why the proxy is unsafe.
 
-## Attack 9: Best-of-N should improve if the model is calibrated.
+## Attack 9: Candidate-pool selection should improve if the model is calibrated.
 
-**Answer:** If proxy score equals true utility and the candidate distribution is calibrated, Best-of-N can help. The paper studies the common failure case where the proxy omits hidden geometry and the candidate distribution contains view-equivalent impostors.
+**Answer:** If proxy score equals true utility and the candidate distribution is calibrated, larger pools can help. The paper studies the common failure case where the proxy omits hidden geometry and the candidate distribution contains view-equivalent impostors.
 
 ## Attack 10: This is not enough for ICLR.
 

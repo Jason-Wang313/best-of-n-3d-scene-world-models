@@ -8,7 +8,7 @@ These are the ten papers or paper families reviewers are most likely to use to a
 
 **Attack:** Classical multiview geometry already says sparse silhouettes and projections underdetermine 3D shape.
 
-**Response:** Correct. The paper does not claim that ambiguity is new. The new mechanism is that a learned multi-candidate scene-world model plus Best-of-N proxy selection converts this ambiguity into an N-dependent failure mode: rare sparse-view impostors become more likely and are selected more often as N grows.
+**Response:** Correct. The paper does not claim that ambiguity is new. The new mechanism is that a learned multi-candidate scene-world model plus sparse-view proxy selection converts this ambiguity into a candidate-pool failure mode: rare sparse-view impostors become more likely and are selected more often as N grows.
 
 ## 2. RegNeRF, SparseNeRF, DietNeRF, MVSNeRF
 
@@ -20,13 +20,13 @@ These are the ten papers or paper families reviewers are most likely to use to a
 
 **Attack:** Scene completion already studies hidden geometry from sparse observations.
 
-**Response:** Scene completion predicts a scene; this work studies selection over many predicted scenes under a sparse scorer. The failure is not merely hidden-region error, but the amplification of hidden-region error by Best-of-N.
+**Response:** Scene completion predicts a scene; this work studies selection over many predicted scenes under a sparse scorer. The failure is not merely hidden-region error, but the amplification of hidden-region error by candidate-pool pressure.
 
 ## 4. OccWorld and DriveWorld
 
 **Attack:** 3D occupancy world models already exist.
 
-**Response:** These papers motivate the architecture class. They do not isolate Best-of-N inference or a sparse proxy reranking hazard. This repo can be viewed as a diagnostic benchmark for such models.
+**Response:** These papers motivate the architecture class. They do not isolate sparse-view candidate selection or a proxy reranking hazard. This repo can be viewed as a diagnostic benchmark for such models.
 
 ## 5. Generative Gaussian Splatting and dynamic 3DGS
 
@@ -40,11 +40,11 @@ These are the ten papers or paper families reviewers are most likely to use to a
 
 **Response:** Those works train or evaluate multiple outputs. They do not identify a geometric sparse-view exploit where the best proxy candidate becomes less globally consistent as N increases.
 
-## 7. Reward overoptimization and verifier-guided Best-of-N
+## 7. Reward overoptimization and verifier-guided candidate selection
 
-**Attack:** Proxy overoptimization under Best-of-N is already known from reward models and verifiers.
+**Attack:** Proxy overoptimization under candidate selection is already known from reward models and verifiers.
 
-**Response:** The project borrows that conceptual lens. The novelty is the 3D mechanism: sparse views create equivalence classes of hidden geometry, and Best-of-N preferentially selects members that overfit the observed projections.
+**Response:** The project borrows that conceptual lens. The novelty is the 3D mechanism: sparse views create equivalence classes of hidden geometry, and candidate-pool pressure preferentially selects members that overfit the observed projections.
 
 ## 8. Deep ensembles and uncertainty repair
 

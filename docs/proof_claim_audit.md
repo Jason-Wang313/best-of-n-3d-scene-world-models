@@ -10,9 +10,9 @@
 
 **Weakness:** The construction uses orthographic axis views and binary occupancy. Extension to photometric NeRF/3DGS scoring requires assumptions about opacity, rendering tolerance, and view discretization.
 
-## Formal Claim B: N-dependent selection amplification
+## Formal Claim B: Candidate-pool selection amplification
 
-**Claim:** If a candidate sampler has nonzero probability p of producing a proxy-perfect but hidden-inconsistent candidate, then the probability that naive Best-of-N sees at least one such candidate is 1 - (1 - p)^N, increasing in N.
+**Claim:** If a candidate sampler has nonzero probability p of producing a proxy-perfect but hidden-inconsistent candidate, then the probability that the naive sparse-view selector sees at least one such candidate is 1 - (1 - p)^N, increasing in N.
 
 **Status:** Proven under independent sampling and fixed p.
 
@@ -20,7 +20,7 @@
 
 **Weakness:** Real world-model samples may be correlated, and proxy-perfect impostors may not always dominate. The benchmark does not require perfection; the empirical curves show approximate dominance.
 
-## Empirical Claim C: Naive Best-of-N worsens true 3D consistency in the benchmark
+## Empirical Claim C: The naive sparse-view selector worsens true 3D consistency in the benchmark
 
 **Claim:** In the full run, increasing N improves sparse proxy score but worsens true 3D IoU and hidden-region error for naive selection.
 
@@ -32,7 +32,7 @@
 
 ## Empirical Claim D: Repair reduces the exploitation gap
 
-**Claim:** The coverage-aware reranker reduces exploitation gap and hidden error relative to naive Best-of-N.
+**Claim:** The coverage-aware reranker reduces exploitation gap and hidden error relative to the naive sparse-view selector.
 
 **Status:** Supported in the benchmark.
 
@@ -42,7 +42,7 @@
 
 ## Claims Excluded
 
-- No claim that all Best-of-N scene-world models fail.
+- No claim that all candidate-selection scene-world models fail.
 - No claim that the repair is optimal.
 - No claim that the synthetic benchmark predicts real-world magnitude.
 - No claim that sparse-view regularization papers are insufficient for reconstruction; they address a different training-time problem.

@@ -8,14 +8,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from bon3d.geometry import project_silhouette
+from view_impostor_audit.geometry import project_silhouette
 
 
 def plot_tradeoff(summary: pd.DataFrame, output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     fig, axes = plt.subplots(1, 3, figsize=(12.5, 3.6), constrained_layout=True)
     colors = {"naive": "#b23a48", "repaired": "#2f7f6f"}
-    labels = {"naive": "Sparse-view Best-of-N", "repaired": "Coverage-aware rerank"}
+    labels = {"naive": "Sparse-view selector", "repaired": "Coverage-aware rerank"}
     for method, group in summary.groupby("method"):
         group = group.sort_values("n")
         x = group["n"].to_numpy()
