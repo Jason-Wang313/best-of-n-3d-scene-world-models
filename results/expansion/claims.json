@@ -1,0 +1,30 @@
+{
+  "mode": "full-v3",
+  "claim_pass": true,
+  "checks": {
+    "replicated_baseline_proxy_increases": true,
+    "replicated_baseline_true_iou_drops": true,
+    "n256_proxy_saturates": true,
+    "n256_repair_beats_naive_true_iou": true,
+    "n256_repair_reduces_gap": true,
+    "n256_repair_beats_random": true,
+    "candidate_proxy_not_perfectly_calibrated": true
+  },
+  "key_numbers": {
+    "naive_n1_proxy": 0.6719788598311206,
+    "naive_nmax_proxy": 1.0,
+    "naive_n1_true_iou": 0.3538895308102593,
+    "naive_nmax_true_iou": 0.355170761349493,
+    "naive_nmax_gap": 0.644829238650507,
+    "repaired_nmax_true_iou": 0.5814538785684469,
+    "repaired_nmax_gap": 0.4185461214315532,
+    "random_nmax_true_iou": 0.526266494196176,
+    "baseline_naive_n1_proxy": 0.7906157969844952,
+    "baseline_naive_n64_proxy": 1.0,
+    "baseline_naive_n1_true_iou": 0.5204136909791228,
+    "baseline_naive_n64_true_iou": 0.3400754020213491,
+    "baseline_naive_n64_gap": 0.6599245979786508,
+    "baseline_repaired_n64_true_iou": 0.8513247288757348,
+    "baseline_repaired_n64_gap": 0.1265284354282169
+  }
+}

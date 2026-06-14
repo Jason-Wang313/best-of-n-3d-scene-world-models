@@ -1,0 +1,31 @@
+{
+  "mode": "full-v3",
+  "main_grid": 20,
+  "main_scenes": 4,
+  "main_seeds": [
+    1729
+  ],
+  "main_n_values": [
+    1,
+    16,
+    64,
+    256
+  ],
+  "stress_grid": 18,
+  "stress_scenes": 1,
+  "stress_seeds": [
+    1729
+  ],
+  "stress_n_values": [
+    256
+  ],
+  "outputs": {
+    "trials": "results\\expansion\\expanded_trials.csv",
+    "summary": "results\\expansion\\expanded_summary.csv",
+    "candidates": "results\\expansion\\candidate_diagnostics.csv",
+    "ablation": "results\\expansion\\ablation_summary.csv",
+    "correlation": "results\\expansion\\correlation_summary.csv",
+    "failures": "results\\expansion\\failure_cases.csv",
+    "claims": "results\\expansion\\claims.json"
+  }
+}

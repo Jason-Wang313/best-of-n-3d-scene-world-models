@@ -22,13 +22,15 @@ collapse, and geometric exploitation gap.
 python -m pytest
 python experiments/run_synthetic.py --preset smoke --output results/smoke
 python experiments/run_synthetic.py --preset full --output results/full
+python experiments/run_expansion_suite.py --mode full --output results/expansion
 python scripts/build_paper.py
+python scripts/run_claim_audit.py
 ```
 
 The paper build script writes:
 
-- `paper/final/iclr_submission.pdf`
-- `C:\Users\wangz\OneDrive\Desktop\best-of-n-3d-scene-world-models-v2.pdf`
+- `paper/final/best-of-n-3d-scene-world-models-v3.pdf`
+- `C:\Users\wangz\OneDrive\Desktop\best-of-n-3d-scene-world-models-v3.pdf`
 
 ## Repository Layout
 
@@ -53,3 +55,12 @@ with proxy fit, ensemble geometry consensus, visual-hull volume plausibility,
 and surface-complexity penalties. This tests whether a cheap uncertainty and
 coverage signal can reduce proxy exploitation without needing ground-truth
 hidden geometry at test time.
+
+## v3 Submission Artifact
+
+The v3 manuscript is a 25+ page submission-ready paper. The replicated
+72-scene benchmark in `results/full` is the main statistical evidence. The
+compact v3 stress suite in `results/expansion` adds pool-size-256 diagnostics,
+view-axis stress, sampler-mixture stress, hidden-mass stress, repair ablations,
+candidate-level calibration, failure slices, and a machine-readable
+`claims.json` audit.

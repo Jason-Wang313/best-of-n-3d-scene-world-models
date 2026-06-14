@@ -31,6 +31,25 @@ class Candidate:
     index: int
 
 
+@dataclass(frozen=True)
+class SamplerConfig:
+    """Mixture and hidden-mass settings for simulated scene-world candidates."""
+
+    faithful_prob: float = 0.56
+    view_impostor_prob: float = 0.29
+    drift_prob: float = 0.15
+    hidden_fill_scale: float = 1.0
+    coherent_block_prob: float = 0.30
+    thin_shell_prob: float = 0.72
+
+    def normalized_probs(self) -> tuple[float, float, float]:
+        values = np.asarray([self.faithful_prob, self.view_impostor_prob, self.drift_prob], dtype=float)
+        if np.any(values < 0) or float(values.sum()) <= 0:
+            raise ValueError("sampler probabilities must be nonnegative and not all zero")
+        values = values / values.sum()
+        return float(values[0]), float(values[1]), float(values[2])
+
+
 def _add_box(occupancy: np.ndarray, rng: np.random.Generator) -> None:
     n = occupancy.shape[0]
     lo = rng.integers(2, max(3, n // 2), size=3)
@@ -104,7 +123,12 @@ def _drift_candidate(target: np.ndarray, rng: np.random.Generator) -> np.ndarray
     return occ
 
 
-def _view_impostor_candidate(target: np.ndarray, rng: np.random.Generator, axes: Iterable[str]) -> np.ndarray:
+def _view_impostor_candidate(
+    target: np.ndarray,
+    rng: np.random.Generator,
+    axes: Iterable[str],
+    config: SamplerConfig,
+) -> np.ndarray:
     axes = normalize_axes(axes)
     observed = visible_mask(target, axes)
     hull = visual_hull_from_scene(target, axes)
@@ -113,14 +137,15 @@ def _view_impostor_candidate(target: np.ndarray, rng: np.random.Generator, axes:
 
     # Most impostors are thin shells; some carry random hidden mass while still
     # preserving every sparse-view first hit and silhouette.
-    if rng.random() < 0.72:
-        fill_prob = rng.uniform(0.000, 0.018)
+    if rng.random() < config.thin_shell_prob:
+        fill_prob = rng.uniform(0.000, 0.018) * config.hidden_fill_scale
     else:
-        fill_prob = rng.uniform(0.025, 0.070)
+        fill_prob = rng.uniform(0.025, 0.070) * config.hidden_fill_scale
+    fill_prob = float(np.clip(fill_prob, 0.0, 0.25))
     occ |= (rng.random(target.shape) < fill_prob) & hidden_pool
 
     # Rarely add a small coherent false block inside the visual hull.
-    if rng.random() < 0.30 and hidden_pool.any():
+    if rng.random() < config.coherent_block_prob and hidden_pool.any():
         coords = np.argwhere(hidden_pool)
         center = coords[int(rng.integers(0, len(coords)))]
         radius = int(rng.integers(2, 4))
@@ -140,16 +165,19 @@ def sample_candidates(
     n: int,
     rng: np.random.Generator,
     proxy_axes: Iterable[str] = ("x", "y"),
+    sampler: SamplerConfig | None = None,
 ) -> list[Candidate]:
     """Sample candidate next scenes from a biased synthetic world model."""
 
+    config = SamplerConfig() if sampler is None else sampler
+    probs = config.normalized_probs()
     candidates: list[Candidate] = []
     for index in range(n):
-        mode = str(rng.choice(["faithful", "view_impostor", "drift"], p=[0.56, 0.29, 0.15]))
+        mode = str(rng.choice(["faithful", "view_impostor", "drift"], p=probs))
         if mode == "faithful":
             occ = _faithful_candidate(target, rng)
         elif mode == "view_impostor":
-            occ = _view_impostor_candidate(target, rng, proxy_axes)
+            occ = _view_impostor_candidate(target, rng, proxy_axes, config)
         else:
             occ = _drift_candidate(target, rng)
         candidates.append(Candidate(occ.astype(bool), mode=mode, index=index))

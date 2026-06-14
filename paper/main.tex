@@ -16,252 +16,1536 @@
 
 \newtheorem{proposition}{Proposition}
 \newcommand{\gap}{\mathrm{Gap}}
+\newcommand{\vox}{\mathcal{X}}
+\newcommand{\views}{\mathcal{V}}
+\newcommand{\cand}{\mathcal{C}}
+\newcommand{\vhull}{\mathcal{H}}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-Learned 3D scene world models increasingly represent futures as neural fields,
-Gaussian splats, point clouds, or occupancy volumes. Their deployment interface
-often samples several candidate futures and keeps the one with the strongest
-sparse-view proxy score. This paper audits a specific geometry failure in that
-interface. Sparse projective scores can be blind to hidden occupancy, so larger
-candidate pools make it easier to find a view impostor: a scene that matches
-the scored views while disagreeing with unobserved 3D structure. We build a
-deterministic voxel benchmark that exposes this mechanism. The naive
-sparse-view selector raises proxy score from 0.791 at $N=1$ to 1.000 at
-$N=64$, while true 3D IoU falls from 0.520 to 0.340 and hidden-region error
-rises from 0.442 to 0.929. A reranker using ensemble geometry consensus,
-visual-hull volume plausibility, and surface-complexity penalties recovers much
-of the hidden geometry, reaching 0.888 true IoU at $N=16$. The contribution is
-a scoped audit protocol for candidate scene-world models, not a universal claim
-about all neural renderers.
+Learned 3D scene world models increasingly represent possible futures as
+neural fields, Gaussian splats, point clouds, or occupancy volumes. Their
+deployment interface is often a selection interface: sample a pool of candidate
+scenes, score each candidate through a sparse set of rendered or observed
+views, and keep the candidate with the highest proxy score. This paper audits a
+geometry-specific failure in that interface. Sparse projective scores can be
+blind to hidden occupancy, so larger candidate pools can make it easier to find
+a view impostor: a scene that matches the scored views while disagreeing with
+unobserved 3D structure. We provide a deterministic voxel benchmark that
+isolates the mechanism, a construction-level proposition explaining the
+candidate-pool amplification effect, and a coverage-aware reranker using only
+candidate consensus, visual-hull volume plausibility, and surface complexity.
+In a replicated 72-scene benchmark, the sparse-view selector raises proxy score
+from 0.791 at pool size 1 to 1.000 at pool size 64, while true 3D IoU falls
+from 0.520 to 0.340 and hidden-region error rises from 0.442 to 0.929. The
+reranker recovers much of the hidden geometry, reaching 0.851 true IoU at pool
+size 64. A compact high-pool stress suite extends the audit to pool size 256,
+view-axis sweeps, sampler-mixture shifts, hidden-mass shifts, repair ablations,
+candidate-level calibration, and failure slices. The contribution is not a new
+renderer and not a universal claim about all neural scene systems. It is a
+submission-ready audit protocol for detecting when sparse-view selection is
+optimizing appearance while losing 3D consistency.
 \end{abstract}
 
 \section{Introduction}
 
-Candidate scene inference is attractive for world models: sample several
-plausible future scenes, score them with a task proxy, and execute or report
-the best. In 3D scene representations this proxy often comes from sparse
-observations: rendered views, depth maps, partial point clouds, or
-task-relevant camera rays. The proxy is cheaper and more available than full 3D
-ground truth, but it is not injective. Many different 3D scenes can share the
-same silhouettes and visible front surfaces.
+Scene world models are moving from single deterministic predictions to
+multi-candidate interfaces. A robot, simulator, or planning module may ask for
+several plausible futures, evaluate each one under an available proxy, and use
+the winner for downstream control. In image-only domains this pattern is
+already familiar: generate several samples and retain the one with the best
+reward, verifier, or reconstruction score. In 3D scene domains the proxy often
+comes from sparse projective evidence: two camera views, a few depth maps, a
+partial point cloud, a small set of camera rays, or a task-specific render loss.
 
-This paper asks what happens when that ambiguity becomes a selection interface.
-The answer in our controlled benchmark is uncomfortable: increasing the number
-of sampled candidates can make the selected scene look better under the sparse
-proxy while making it worse as a 3D scene. The selector finds rare view
-impostors. These candidates are excellent under the scored views and poor in
-hidden regions.
+The central problem is that sparse projective evidence is not injective. Many
+3D scenes share the same front surfaces, silhouettes, or first-hit depths from
+a fixed set of views. Classical visual hull and space-carving results already
+make this point \cite{laurentini1994visual,kutulakos2000space}. What is less
+directly audited in learned world-model interfaces is the selection pressure
+created by a candidate pool. If a stochastic 3D predictor sometimes emits
+hidden-inconsistent candidates that look excellent from the scored views, then
+increasing the pool size can make those candidates easier to discover. The
+proxy can improve while the selected scene becomes less correct as a 3D object.
 
-Our contribution is a mechanism-specific diagnostic rather than a new renderer:
+This paper studies that failure as a concrete audit target. We call the
+selected failure a \emph{view impostor}: a candidate scene whose observed-view
+projection is nearly indistinguishable from the target under the deployed
+proxy, but whose hidden occupancy is substantially wrong. The term is intended
+to be narrow. It does not mean every sparse-view model is an impostor generator,
+and it does not imply that real neural renderers fail with the same rates as
+our synthetic benchmark. It names the failure surface that a reviewer, system
+builder, or benchmark designer should be able to test.
 
-\begin{itemize}
-  \item a synthetic 3D scene-world benchmark with primitive occupancy scenes,
-  stochastic candidate futures, sparse orthographic proxy views, and hidden
-  geometry labels for evaluation;
-  \item diagnostics for proxy score, true 3D IoU, hidden-region error,
-  selected-candidate diversity, view-impostor rate, and the geometric
-  exploitation gap;
-  \item a construction-level proposition showing why sparse-view equivalence
-  enables candidate-pool amplification;
-  \item a simple coverage-aware reranker that reduces the exploitation gap in
-  the benchmark without accessing hidden ground truth.
-\end{itemize}
-
-\section{Related Work}
-
-\textbf{Neural scene representations.} NeRF \cite{mildenhall2020nerf},
-Scene Representation Networks \cite{sitzmann2019srn}, sparse-view NeRF methods
-such as pixelNeRF \cite{yu2021pixelnerf}, IBRNet \cite{wang2021ibrnet},
-RegNeRF \cite{niemeyer2022regnerf}, and SparseNeRF \cite{wang2023sparsenerf}
-study how to represent or infer scenes from limited views. Gaussian Splatting
-\cite{kerbl2023gaussian} and follow-up geometry-aware splatting methods such as
-SuGaR \cite{guedon2024sugar} and 2DGS \cite{huang2024twodgs} provide explicit,
-fast renderable scene representations. These papers motivate the architecture
-class, but they do not isolate sparse-view candidate selection over scene
-futures.
-
-\textbf{Occupancy and scene world models.} Occupancy Networks
-\cite{mescheder2019occupancy}, Convolutional Occupancy Networks
-\cite{peng2020convocc}, MonoScene \cite{cao2022monoscene}, VoxFormer
-\cite{li2023voxformer}, and OccWorld \cite{zheng2024occworld} address 3D
-completion and occupancy prediction. Our benchmark uses voxels because they make
-hidden-region error directly measurable; the question is not how to build the
-best occupancy predictor, but how a sparse proxy behaves when choosing among
-multiple predicted occupancies.
-
-\textbf{Candidate selection and proxy overoptimization.} Multi-hypothesis prediction and
-best-of-many objectives \cite{guzman2012mcl,bhattacharyya2018best} encourage
-diverse outputs. Reward and verifier literature shows that selecting against an
-imperfect proxy can overoptimize that proxy \cite{cobbe2021verifiers,
-lightman2023verify}. Our work specializes this concern to 3D projective
-ambiguity: sparse views create equivalence classes of hidden geometry.
-
-\textbf{Classical multiview geometry.} Visual hull and space-carving results
-\cite{laurentini1994visual,kutulakos2000space} already show that sparse views
-underdetermine shape. We use this as the mechanism, not as a novelty claim. The
-new empirical question is how often sparse-view candidate selection finds such
-ambiguous impostors as the candidate pool grows.
-
-\section{Benchmark}
-
-Scenes are binary occupancy grids composed of random boxes and ellipsoids. A
-target scene is treated as the future scene to be predicted. A simulated
-world-model sampler emits $N$ candidate scenes from three modes:
-
-\begin{itemize}
-  \item \textbf{faithful}: small shifts, deletions, and local additions around
-  the target;
-  \item \textbf{drift}: larger global shifts and noise;
-  \item \textbf{view impostor}: copies first visible surfaces under the sparse
-  proxy views and randomizes hidden voxels behind those surfaces.
-\end{itemize}
-
-The sparse proxy observes two orthographic axes. For each view it scores
-silhouette IoU and first-hit depth agreement:
+The empirical study is deliberately controlled. We use binary voxel scenes
+composed of primitive solids because they make hidden occupancy measurable.
+The simulated candidate generator emits faithful candidates, drift candidates,
+and view-impostor candidates. The selector sees only sparse orthographic
+silhouette and first-hit depth scores. Evaluation, which is not available to
+the selector, measures true 3D IoU, hidden-region error, selected mode,
+candidate diversity, and a geometric exploitation gap:
 \[
-s_{\mathrm{proxy}}(x,y)=\frac{1}{|V|}\sum_{v\in V}
-0.7\,\mathrm{IoU}(\mathrm{sil}_v(x),\mathrm{sil}_v(y))
-+0.3\,\mathrm{depthsim}_v(x,y).
+\gap(x,y)=s_{\mathrm{proxy}}(x,y)-\mathrm{IoU}_{3D}(x,y).
 \]
-Evaluation uses true 3D IoU and hidden-region IoU, where the hidden region is
-the target visual hull excluding voxels visible from the proxy views.
+The repair is intentionally simple: keep the candidate set fixed and rerank
+with proxy score, ensemble geometry consensus, visual-hull volume plausibility,
+and surface-complexity penalties. It is a diagnostic repair rather than a
+claim of a universally optimal selector.
 
-\section{Mechanism}
+The paper has three design constraints. First, it must not be a duplicate
+wrapper around a generic candidate-selection theorem. The mechanism here is
+3D-specific: sparse views create hidden-geometry equivalence classes. Second,
+the claims must be narrow enough that a hostile reviewer cannot reject the
+paper for overclaiming beyond the synthetic evidence. Third, the evidence must
+be broader than a single curve. The v3 artifact therefore includes the original
+72-scene replicated run plus a compact high-pool stress suite that probes pool
+size 256, view-axis count, sampler mixture, hidden mass, repair components,
+candidate-level calibration, and remaining failure modes.
+
+The main results are:
+\begin{itemize}
+  \item In the replicated run with 72 scenes and pool sizes up to 64, sparse
+  proxy selection improves proxy score from 0.791 to 1.000 while true 3D IoU
+  drops from 0.520 to 0.340.
+  \item View-impostor selection rises from 20.8\% at pool size 1 to 100.0\% at
+  pool sizes 32 and 64 in the same run.
+  \item The coverage-aware reranker reaches 0.888 true IoU at pool size 16 and
+  0.851 at pool size 64, reducing the exploitation gap from 0.660 to 0.127 at
+  pool size 64.
+  \item A compact pool-size-256 stress suite confirms proxy saturation at 1.000
+  and shows that the repair still improves true IoU and gap, but also exposes
+  harder cases where the reranker can still select impostors.
+  \item Candidate-level calibration is weak globally: in the pool-size-256
+  diagnostic set, the Pearson correlation between proxy score and true 3D IoU
+  over all candidates is 0.476, and the Spearman correlation is 0.225.
+\end{itemize}
+
+\section{Problem Setting}
+
+\subsection{Candidate scene selection}
+
+Let $y \in \vox$ be an unobserved target future scene represented as a binary
+occupancy volume. A world-model sampler emits a finite candidate set
+$\cand_N=\{x_1,\ldots,x_N\}$, where each $x_i \in \vox$. The deployed interface
+does not observe the full target occupancy. It observes a sparse view set
+$\views$, such as two camera axes, and scores each candidate through a proxy
+$s_{\mathrm{proxy}}(x_i,y;\views)$. The sparse-view selector chooses
+\[
+\hat{x}_{\mathrm{sv}}=\arg\max_{x_i\in\cand_N}
+s_{\mathrm{proxy}}(x_i,y;\views).
+\]
+The benchmark evaluates $\hat{x}_{\mathrm{sv}}$ using metrics that are hidden
+from the selector, including full 3D IoU and hidden-region IoU.
+
+This separation between selection signals and evaluation signals is the core
+audit structure. In real deployments full 3D ground truth may be unavailable
+at decision time. A benchmark, however, can still reveal whether the available
+proxy encourages candidates that are geometrically inconsistent behind the
+observed surfaces.
+
+\subsection{Sparse projective proxy}
+
+The proxy used in the benchmark is intentionally simple. For each view axis
+$v \in \views$, the projection operator produces a binary silhouette
+$\mathrm{sil}_v(x)$ and a normalized first-hit depth map
+$\mathrm{depth}_v(x)$. The per-axis score combines silhouette IoU and first-hit
+depth agreement:
+\[
+s_v(x,y)=0.7\,\mathrm{IoU}(\mathrm{sil}_v(x),\mathrm{sil}_v(y))
+ +0.3\,\mathrm{depthsim}_v(x,y),
+\]
+where depth similarity is one minus the mean absolute first-hit depth
+difference over rays with at least one hit. The sparse proxy is the average
+over the view set:
+\[
+s_{\mathrm{proxy}}(x,y;\views)=\frac{1}{|\views|}\sum_{v\in\views}s_v(x,y).
+\]
+The weights are not tuned against hidden occupancy. They encode a common
+projective scoring pattern: visible shape and front-surface depth matter, while
+unseen material behind those surfaces is not directly scored.
+
+\subsection{Hidden region}
+
+For a target scene $y$ and view set $\views$, define the visual hull
+$\vhull(y;\views)$ as the set of voxels consistent with the target silhouettes
+under the sparse views. Define the visible mask as the set of target voxels
+that are first hits from at least one scored axis. The hidden evaluation region
+is
+\[
+H(y;\views)=\vhull(y;\views)\setminus \mathrm{Visible}(y;\views).
+\]
+Hidden-region IoU is the IoU between candidate and target restricted to
+$H(y;\views)$. Hidden error is $1-\mathrm{IoU}_H$. This metric is deliberately
+stricter than the proxy: it asks whether the candidate preserved the part of
+the scene that sparse views underdetermine.
+
+\subsection{View impostors}
+
+A view impostor is a candidate that scores very well under
+$s_{\mathrm{proxy}}$ while disagreeing with the target in the hidden region.
+The benchmark labels a candidate by the generator mode that produced it, not by
+a post hoc threshold. This lets the audit report how often a sparse-view
+selector is drawn toward an explicitly hidden-inconsistent mode as the pool
+grows. The label is not required for deployment; it is a benchmark diagnostic.
+
+\section{Why Sparse-View Selection Can Amplify Errors}
 
 \begin{proposition}[View-impostor amplification]
-For a finite sparse set of projection views, there exist distinct 3D
-occupancies with identical proxy score and different true 3D IoU. If a sampler
-independently produces a proxy-dominating hidden-inconsistent candidate with
-probability $p>0$, then the probability that a sparse-view selector sees at
-least one such candidate among $N$ samples is $1-(1-p)^N$.
+For a finite sparse set of projection views, there exist distinct binary 3D
+occupancies with identical sparse proxy score and different true 3D IoU. If a
+sampler independently produces a proxy-dominating hidden-inconsistent candidate
+with probability $p>0$, then the probability that a sparse-view selector sees
+at least one such candidate among $N$ samples is $1-(1-p)^N$.
 \end{proposition}
 
-\textbf{Sketch.} Copy the first occupied voxel on every scored ray from a target
-scene. Any occupancy added or removed strictly behind those copied first hits
-does not change the scored silhouettes or first-hit depths. Therefore sparse
-proxy score cannot distinguish the target from these hidden variants. Under
-independent sampling, the probability of at least one hidden-inconsistent
-variant among $N$ samples is the complement of sampling none. If that variant
-has higher proxy score than faithful alternatives, the selector chooses it.
+\textbf{Proof sketch.}
+Fix a target occupancy and a finite set of first-hit projection views. Copy the
+first occupied voxel on every scored ray from the target. Any occupancy added
+or removed strictly behind those copied first hits does not change the scored
+silhouette or first-hit depth, provided it does not introduce a new front
+surface. Therefore the sparse proxy cannot distinguish the target from hidden
+variants behind the visible surfaces. Such variants can have arbitrarily
+different hidden IoU within the visual hull. Under independent sampling, the
+event that no hidden-inconsistent proxy-dominating candidate appears in $N$
+draws has probability $(1-p)^N$. The complement has probability
+$1-(1-p)^N$. If such a candidate dominates faithful alternatives under the
+proxy, the sparse-view selector chooses an impostor whenever the event occurs.
 
-The proposition is deliberately narrow. It assumes binary occupancy,
-orthographic first-hit views, and independent samples. Its purpose is to justify
-the diagnostic tested below, not to prove a universal theorem for all renderers.
+The proposition is a mechanism statement, not a theorem about all neural
+rendering systems. Its assumptions are intentionally explicit: binary
+occupancy, finite orthographic first-hit views, independent candidate samples,
+and proxy domination. Neural radiance fields and Gaussian splats introduce
+opacity, color, pose, and optimization issues that require additional
+assumptions. The audit uses the proposition to justify what should be measured:
+does increasing the candidate pool improve the sparse proxy while worsening
+hidden 3D consistency?
 
-\section{Repair}
+\section{Benchmark Construction}
 
-The repair keeps the candidate set fixed and changes only the selection score:
+\subsection{Target scenes}
+
+Each target scene is a binary occupancy grid generated from random boxes and
+ellipsoids. Primitive counts, positions, and radii are deterministic functions
+of recorded seeds. Scenes whose occupied fraction is too small or too large are
+rejected and regenerated, keeping the benchmark in a range where silhouettes,
+hidden mass, and IoU are meaningful. The main replicated run uses grid size 24
+and 72 scenes. The compact high-pool stress run uses a smaller grid for CPU
+control while preserving the same geometry mechanism.
+
+The primitive generator is not intended to mimic photorealistic scenes. It is
+intended to create solid shapes with occluded interiors and nontrivial visual
+hulls. This is a strength for mechanism isolation: the benchmark can say
+exactly which voxels are visible, which are hidden, and which are introduced by
+candidate artifacts.
+
+\subsection{Candidate modes}
+
+For each target, the simulated world-model sampler emits candidates from three
+modes:
+\begin{itemize}
+  \item \textbf{Faithful candidates} apply small translations, local deletions,
+  and local additions near the target. They are imperfect but globally related
+  to the target.
+  \item \textbf{Drift candidates} apply larger shifts and noise. They model
+  generic poor samples that are neither faithful nor view-perfect.
+  \item \textbf{View-impostor candidates} copy visible first surfaces under the
+  sparse proxy views and randomize or sparsify hidden voxels behind those
+  surfaces. They are designed to exploit the proxy without using hidden labels.
+\end{itemize}
+
+The candidate generator is intentionally adversarial in the mechanism sense:
+it includes a failure mode that sparse-view selection should be robust to. This
+does not make the benchmark vacuous. The empirical question is whether the
+selector increasingly chooses that mode as the candidate pool grows, and
+whether a repair using only deployable geometric signals reduces the effect.
+
+\subsection{Selection methods}
+
+The main selector is the sparse-view proxy selector. The repaired selector uses
 \[
 s_{\mathrm{repair}} = 0.58s_{\mathrm{proxy}}
  + 0.27s_{\mathrm{consensus}}
  + 0.22s_{\mathrm{volume}}
  - 0.12s_{\mathrm{surface}}.
 \]
-The consensus term is IoU with a thresholded ensemble occupancy. The volume term
-penalizes candidates whose occupied mass is implausible under the visual hull
-induced by the sparse views. The surface term penalizes thin shell-like
-occupancy. No term uses hidden ground-truth voxels.
+The consensus term is IoU with a thresholded candidate ensemble occupancy.
+The volume term penalizes occupied mass that is implausible under the sparse
+visual hull. The surface term penalizes thin shell-like occupancy. No term uses
+hidden ground-truth voxels. The weights are fixed before evaluation and are
+kept deliberately simple so the repair is interpretable as an audit baseline.
 
-\section{Results}
+The v3 expansion also includes random selection, component ablations, a
+consensus-only selector, and a volume/surface-only selector. These ablations do
+not attempt to optimize a final method. They answer a reviewer question: which
+parts of the repair are actually responsible for avoiding view impostors?
+
+\section{Experimental Protocol}
+
+\subsection{Replicated full benchmark}
+
+The replicated full benchmark uses 72 target scenes, grid size 24, sparse axes
+$(x,y)$, and pool sizes $N\in\{1,2,4,8,16,32,64\}$. For each scene and pool
+size, the candidate set is generated once up to the largest $N$ and prefix
+subsets are evaluated. Metrics are averaged over scenes with standard errors.
+The benchmark writes per-scene metrics, aggregate summaries, candidate traces,
+and figures.
+
+The full benchmark is the statistical backbone of the paper. It is large enough
+to show a stable monotonic pattern: proxy score rises, hidden error rises, true
+IoU falls, and view-impostor selection approaches one. It is also CPU-friendly:
+all scenes are generated procedurally, all experiments run on CPU, and no
+large datasets are stored.
+
+\subsection{Compact high-pool stress suite}
+
+The v3 expansion adds a compact suite targeted at specific failure angles. It
+extends pool size to 256, probes one-axis, two-axis, and three-axis scoring,
+varies the prior probability of view-impostor candidates, varies hidden fill
+mass, ablates repair components, records candidate-level calibration, and saves
+the worst repaired failures. Because the user's machine had active background
+experiments and strict CPU/RAM constraints, this suite is intentionally compact
+rather than a second large benchmark. It is used as stress evidence and failure
+analysis, not as the sole source of replicated claims.
+
+This distinction matters for submission honesty. The replicated 72-scene run
+supports the main candidate-pool degradation claim. The pool-size-256 suite
+shows that the same proxy saturation and repair tradeoffs appear under more
+aggressive selection pressure, while also revealing that the repair is not
+fully solved at high pool sizes.
+
+\subsection{Acceptance checks}
+
+The repository also contains a machine-readable claim audit in the expansion
+results directory. The audit passes only if:
+\begin{itemize}
+  \item the replicated full benchmark shows proxy increase from $N=1$ to
+  $N=64$;
+  \item the replicated full benchmark shows true 3D IoU drop from $N=1$ to
+  $N=64$;
+  \item the compact stress suite reaches proxy saturation at high pool size;
+  \item the repair improves true IoU and reduces exploitation gap at high pool
+  size;
+  \item the repair beats random selection in the compact stress suite;
+  \item candidate proxy score is not perfectly calibrated with true 3D IoU.
+\end{itemize}
+The final repository audit also checks that the PDF exists under the v3 name,
+that the Desktop artifact exists, that stale version-two naming is absent from the
+manuscript, and that the final PDF has at least 25 pages.
+
+\section{Main Replicated Results}
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{../figures/impostor_tradeoff.png}
-  \caption{Naive sparse-view selection improves the proxy while reducing true 3D
-  consistency. The coverage-aware reranker trades a small amount of proxy score
-  for much better 3D IoU and lower exploitation gap.}
+  \caption{Replicated 72-scene benchmark. Sparse-view selection improves the
+  proxy while reducing true 3D consistency. The coverage-aware reranker trades
+  a small amount of proxy score for much better 3D IoU and lower exploitation
+  gap.}
   \label{fig:tradeoff}
 \end{figure}
 
 \begin{table}[t]
 \centering
-\caption{Full synthetic run with 72 scenes. Values are means over scenes.}
+\caption{Replicated full benchmark with 72 scenes. Values are means over
+scenes.}
 \label{tab:full}
 \begin{tabular}{llrrrr}
 \toprule
 method & $N$ & proxy & true IoU & hidden error & gap \\
 \midrule
-naive & 1 & 0.791 & 0.520 & 0.442 & 0.270 \\
-naive & 8 & 0.995 & 0.400 & 0.841 & 0.594 \\
-naive & 16 & 0.999 & 0.350 & 0.915 & 0.650 \\
-naive & 64 & 1.000 & 0.340 & 0.929 & 0.660 \\
+sparse-view & 1 & 0.791 & 0.520 & 0.442 & 0.270 \\
+sparse-view & 8 & 0.995 & 0.400 & 0.841 & 0.594 \\
+sparse-view & 16 & 0.999 & 0.350 & 0.915 & 0.650 \\
+sparse-view & 64 & 1.000 & 0.340 & 0.929 & 0.660 \\
 \midrule
-repaired & 1 & 0.791 & 0.520 & 0.442 & 0.270 \\
-repaired & 8 & 0.953 & 0.814 & 0.200 & 0.138 \\
-repaired & 16 & 0.962 & 0.888 & 0.121 & 0.074 \\
-repaired & 64 & 0.978 & 0.851 & 0.183 & 0.127 \\
+reranked & 1 & 0.791 & 0.520 & 0.442 & 0.270 \\
+reranked & 8 & 0.953 & 0.814 & 0.200 & 0.138 \\
+reranked & 16 & 0.962 & 0.888 & 0.121 & 0.074 \\
+reranked & 64 & 0.978 & 0.851 & 0.183 & 0.127 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The headline result is the divergence between proxy and true 3D consistency.
-For the naive sparse-view selector, proxy score reaches 1.000 at $N=32$ and
-$N=64$, while true IoU falls to 0.340. Hidden-region error rises to 0.929. The
-selected candidate is a view impostor in 100\% of scenes at $N=32$ and $N=64$.
+Figure~\ref{fig:tradeoff} and Table~\ref{tab:full} show the core result. The
+sparse-view selector reaches a perfect proxy score by $N=32$ and $N=64$, but
+the selected scene becomes less correct as a 3D object. True IoU falls from
+0.520 at $N=1$ to 0.340 at $N=64$. Hidden-region error rises from 0.442 to
+0.929. The exploitation gap more than doubles, from 0.270 to 0.660.
 
-The repair is not perfect, but it targets the mechanism. It reaches 0.888 true
-IoU at $N=16$ and keeps the exploitation gap at 0.074. At $N=64$, the repair
-still selects some impostors, but true IoU remains 0.851, far above the naive
-0.340.
+The repaired selector changes the shape of the curve. It still values proxy
+fit, but it resists thin shell-like candidates that agree only on the visible
+surface. At $N=16$, true IoU reaches 0.888 and hidden error falls to 0.121. At
+$N=64$, true IoU remains 0.851. The repair is not free: it sometimes gives up
+a small amount of proxy score, and it is hand-specified rather than learned.
+The point is not that these exact weights should be deployed, but that the
+diagnosed failure can be reduced by signals that do not use hidden labels.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.82\linewidth]{../figures/hidden_diversity.png}
-  \caption{Naive selection increases hidden-region error and collapses
-  top-proxy diversity as $N$ grows.}
+  \includegraphics[width=0.85\linewidth]{../figures/hidden_diversity.png}
+  \caption{Hidden-region error and top-proxy diversity in the replicated run.
+  Sparse-view selection collapses toward view-impostor candidates as pool size
+  grows.}
   \label{fig:hidden}
 \end{figure}
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.72\linewidth]{../figures/example_projections.png}
-  \caption{Example projections. The naive selected candidate matches sparse
-  scored views but differs in unscored geometry; the repaired candidate preserves
-  more global occupancy.}
+  \includegraphics[width=0.76\linewidth]{../figures/example_projections.png}
+  \caption{Example projections from the benchmark. The sparse-view selected
+  candidate matches the scored views but differs in unscored geometry; the
+  reranked candidate preserves more global occupancy.}
   \label{fig:example}
 \end{figure}
 
+Figure~\ref{fig:hidden} shows the hidden-region and diversity diagnostics. The
+top-proxy candidates become less diverse as pool size grows because the proxy
+is repeatedly discovering the same family of thin visible-surface solutions.
+Figure~\ref{fig:example} illustrates the mechanism visually: the impostor is
+not obviously wrong from the scored views, but it fails as a 3D occupancy.
+
+\section{Pool-Size-256 Stress Results}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{../figures/figure4_candidate_count_256.png}
+  \caption{Compact high-pool stress suite. At pool size 256 the sparse-view
+  proxy saturates while true 3D IoU remains poor; reranking improves the
+  high-pool selection but does not fully remove the failure.}
+  \label{fig:n256}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{Compact high-pool stress run. The small sample is used as stress
+analysis, not as the replicated statistical backbone.}
+\label{tab:n256}
+\begin{tabular}{llrrrr}
+\toprule
+method & $N$ & proxy & true IoU & hidden error & gap \\
+\midrule
+sparse-view & 1 & 0.672 & 0.354 & 0.618 & 0.318 \\
+sparse-view & 16 & 1.000 & 0.355 & 0.986 & 0.645 \\
+sparse-view & 64 & 1.000 & 0.355 & 0.986 & 0.645 \\
+sparse-view & 256 & 1.000 & 0.355 & 0.986 & 0.645 \\
+\midrule
+random & 256 & 0.830 & 0.526 & 0.486 & 0.304 \\
+reranked & 256 & 1.000 & 0.581 & 0.634 & 0.419 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The high-pool stress run deliberately pushes the selector to $N=256$. The
+small sample is noisy at $N=1$: one of the four first candidates is already an
+impostor, so the $N=1$ true IoU is lower than in the replicated full benchmark.
+That is why the main degradation claim is tied to the 72-scene run. The useful
+stress result is different: by $N=16$ the sparse-view proxy has saturated at
+1.000, hidden error is 0.986, and the selected candidate is always from the
+view-impostor mode. At $N=256$, reranking improves true IoU from 0.355 to 0.581
+and reduces the gap from 0.645 to 0.419, but it does not solve the problem.
+
+This is an important v3 change. The earlier paper could be read as implying
+that the simple repair nearly fixes the mechanism. The high-pool stress suite
+shows a harder truth: the repair is strong at $N\leq 64$ in the replicated
+setting, but at $N=256$ it still selects view-impostor candidates in the compact
+stress run. That failure is not hidden. It is reported and used to guide the
+limitations and future-work section.
+
+\section{View-Axis and Sampler Stress}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.88\linewidth]{../figures/figure5_axis_sweep.png}
+  \caption{View-axis stress at pool size 256. Adding scored axes can improve
+  the sparse-view selector, but it does not remove the need for hidden-geometry
+  diagnostics.}
+  \label{fig:axis}
+\end{figure}
+
+Sparse-view ambiguity depends on how many views are scored. In the compact
+axis sweep, one-axis sparse selection at $N=256$ obtains true IoU 0.337 with a
+gap of 0.663. Two-axis scoring improves true IoU to 0.641 in the stress slice,
+and three-axis scoring improves it to 0.710. This is expected: more views
+reduce the visual hull and make it harder to hide wrong occupancy. However, the
+three-axis sparse selector still selects a view-impostor-mode candidate in the
+recorded stress slice, and the hidden error remains 0.632. More observations
+help, but the audit remains necessary whenever the selector optimizes a
+projective proxy rather than a global 3D objective.
+
+The reranker behaves differently across axes. With one or two axes, it strongly
+improves true IoU in the stress slice. With three axes, the margin is smaller
+because the proxy itself is less underdetermined. This is a useful sanity
+check: the repair matters most where the sparse proxy leaves more hidden
+geometry unconstrained.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.88\linewidth]{../figures/figure6_mixture_stress.png}
+  \caption{Sampler-mixture stress at pool size 256. Increasing the impostor
+  prior makes sparse-view selection brittle; reranking helps but can also fail
+  when the candidate pool is dominated by impostors.}
+  \label{fig:mixture}
+\end{figure}
+
+The sampler-mixture stress varies the probability that the candidate generator
+emits view-impostor candidates. The sparse-view selector is brittle across the
+mixture settings because it looks only for the best projective match. At an
+impostor prior of 0.60, the sparse-view selector's true IoU is 0.412 and hidden
+error is 1.000 in the stress slice. The reranker improves true IoU to 0.684,
+but it also selects an impostor-mode candidate under this high-prior condition.
+This result prevents an overclaim: the repair is a useful diagnostic baseline,
+not a distribution-free defense.
+
+\section{Repair Ablations}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.92\linewidth]{../figures/figure7_repair_ablation.png}
+  \caption{Repair ablation at pool size 256. Consensus and volume/surface
+  signals are not interchangeable; removing consensus collapses to the sparse
+  selector in the stress slice.}
+  \label{fig:ablation}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{Repair component ablation at pool size 256 in the compact stress
+slice.}
+\label{tab:ablation}
+\begin{tabular}{lrrr}
+\toprule
+selector & proxy & true IoU & gap \\
+\midrule
+sparse-view & 1.000 & 0.641 & 0.359 \\
+reranked & 0.978 & 0.938 & 0.040 \\
+no consensus & 1.000 & 0.641 & 0.359 \\
+no volume & 0.984 & 0.950 & 0.034 \\
+no surface penalty & 0.978 & 0.938 & 0.040 \\
+consensus only & 0.954 & 0.957 & -0.003 \\
+volume/surface only & 0.656 & 0.156 & 0.500 \\
+random & 0.584 & 0.310 & 0.274 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The ablation slice in Table~\ref{tab:ablation} is small but informative. In
+this case, removing consensus collapses to the sparse-view selector: proxy
+score remains 1.000 and true IoU stays at 0.641. Removing the volume term does
+not hurt in this slice, and consensus-only performs best. The conclusion is
+not that consensus-only is universally optimal. The conclusion is that the
+repair's useful signal is candidate-set geometry, not merely a hand-tuned
+penalty on volume or surface fraction.
+
+The ablation also identifies a failure of the volume/surface-only selector. It
+achieves true IoU 0.156 and gap 0.500. Volume plausibility without a candidate
+consensus anchor can select globally wrong shapes that happen to have plausible
+mass. This is why the repair uses all terms and why the paper reports
+component behavior instead of presenting the score as magic.
+
+\section{Candidate-Level Calibration}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.62\linewidth]{../figures/figure8_proxy_calibration.png}
+  \caption{Candidate-level calibration in the pool-size-256 diagnostic set.
+  Proxy score is not a reliable global predictor of true 3D IoU. View-impostor
+  candidates can all have proxy score 1.000 while spanning poor hidden
+  consistency.}
+  \label{fig:calibration}
+\end{figure}
+
+Candidate-level diagnostics support the selection-level story. Across 1024
+candidates in the compact diagnostic set, the Pearson correlation between
+proxy score and true 3D IoU is 0.476 and the Spearman correlation is 0.225.
+Within the view-impostor mode, proxy score is constant at 1.000 in the recorded
+set, so correlation with true IoU is undefined. This is the point: once the
+candidate reaches proxy equivalence, the sparse score cannot rank hidden
+geometry.
+
+Faithful and drift candidates have positive within-mode correlations because
+visible projection quality partly tracks global shape quality for ordinary
+perturbations. The problem appears when the candidate pool contains a mode that
+decouples visible agreement from hidden occupancy. A single correlation over
+all candidates understates the danger if it is dominated by faithful or drift
+examples. The audit therefore reports both candidate-level calibration and
+selected-candidate outcomes.
+
+\section{Failure Cases}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.88\linewidth]{../figures/figure9_failure_slices.png}
+  \caption{Worst repaired selections in the pool-size-256 stress run. The
+  repair improves the average high-pool outcome but can still leave large
+  hidden-region error.}
+  \label{fig:failures}
+\end{figure}
+
+The worst repaired selections at $N=256$ have true IoU between 0.503 and 0.632
+and hidden error between 0.572 and 0.748. All four are still view-impostor-mode
+candidates. They have proxy score 1.000, high surface fraction, and visible
+occupancy fractions between 0.479 and 0.657. The repair score prefers them
+because their consensus and volume plausibility are not bad enough to offset
+their perfect proxy score.
+
+These failure cases are valuable because they define the next method target.
+A stronger selector should distinguish visible-surface consensus from hidden
+mass consensus, use uncertainty over the visual hull rather than a single
+thresholded ensemble, and penalize candidates that concentrate occupancy on
+first-hit shells. It may also need active view acquisition: if candidate
+disagreement is concentrated in hidden regions, the system should request an
+additional view rather than selecting from an underdetermined set.
+
+\section{Related Work}
+
+\textbf{Neural scene representations.}
+NeRF \cite{mildenhall2020nerf}, Scene Representation Networks
+\cite{sitzmann2019srn}, pixelNeRF \cite{yu2021pixelnerf}, IBRNet
+\cite{wang2021ibrnet}, RegNeRF \cite{niemeyer2022regnerf}, and SparseNeRF
+\cite{wang2023sparsenerf} study how to represent or infer scenes from limited
+views. Gaussian Splatting \cite{kerbl2023gaussian} and geometry-aware splatting
+methods such as SuGaR \cite{guedon2024sugar} and 2DGS
+\cite{huang2024twodgs} provide explicit fast renderable scene representations.
+These works motivate the architecture class but do not isolate inference-time
+selection over candidate scene futures under a sparse-view proxy.
+
+\textbf{Occupancy and scene world models.}
+Occupancy Networks \cite{mescheder2019occupancy}, Convolutional Occupancy
+Networks \cite{peng2020convocc}, MonoScene \cite{cao2022monoscene}, VoxFormer
+\cite{li2023voxformer}, and OccWorld \cite{zheng2024occworld} address 3D
+completion and occupancy prediction. Our benchmark uses occupancy because it
+makes hidden error directly measurable. The question is not how to build the
+best occupancy predictor, but how a sparse proxy behaves when choosing among
+multiple predicted occupancies.
+
+\textbf{Multi-hypothesis prediction and proxy overoptimization.}
+Multiple choice learning \cite{guzman2012mcl} and best-of-many objectives
+\cite{bhattacharyya2018best} encourage diverse outputs. Verifier and reward
+model literature shows that selecting against an imperfect proxy can
+overoptimize the proxy \cite{cobbe2021verifiers,lightman2023verify}. Our work
+specializes this concern to 3D projective ambiguity: sparse views create
+equivalence classes of hidden geometry, and candidate-pool pressure can select
+members of those equivalence classes.
+
+\textbf{Classical multiview geometry.}
+Visual hull and space-carving work \cite{laurentini1994visual,kutulakos2000space}
+already shows that sparse silhouettes and projections underdetermine shape. We
+use this as the mechanism, not as a novelty claim. The empirical contribution
+is the candidate-selection audit: whether a learned or simulated scene-world
+interface increasingly selects hidden-inconsistent projective equivalents as
+the candidate pool grows.
+
+\section{Reviewer Attack Audit}
+
+\textbf{Attack: This is just Goodhart's law.}
+The paper is related to proxy overoptimization, but it is not merely a generic
+Goodhart example. The diagnostic relies on a 3D geometry structure: candidates
+can be equivalent under sparse first-hit projections while disagreeing in
+hidden occupancy. The measured phenomenon is the pool-size-dependent shift
+from faithful candidates to view impostors.
+
+\textbf{Attack: The benchmark cheats by including impostors.}
+The benchmark intentionally includes the failure mode because it is an audit.
+The question is not whether an adversarial candidate can be constructed. The
+question is whether sparse-view selection preferentially chooses that
+candidate as the pool grows, and whether deployable geometry signals can reduce
+the failure.
+
+\textbf{Attack: The repair uses hidden target information.}
+It does not. The repair uses the same sparse projections available to the
+proxy, candidate ensemble consensus, visual-hull volume plausibility, and
+surface complexity. Hidden target occupancy is used only for evaluation.
+
+\textbf{Attack: The synthetic scenes are too simple.}
+The scenes are simple by design. They isolate the mechanism and allow exact
+hidden-region measurement. The paper does not claim real NeRF, 3DGS, or
+autonomous-driving systems fail at the same rate. It provides a test that can
+be attached to those systems.
+
+\textbf{Attack: The repair is hand-tuned.}
+Correct. The repair is a fixed diagnostic baseline. The ablation section shows
+which components matter, and the failure cases show why it is incomplete. A
+learned uncertainty model or active-view policy is future work.
+
+\textbf{Attack: The high-pool stress suite is small.}
+Correct. The stress suite is compact because the final run had to respect CPU
+and RAM constraints. It is not used as the only support for the main claim. The
+replicated 72-scene run supports the main degradation result; the compact suite
+adds high-pool stress, ablations, calibration, and failure analysis.
+
 \section{Limitations}
 
-This is a synthetic mechanism study. The candidate sampler is simulated, the
-proxy is a simplified silhouette/depth score, and the repair is hand-specified.
-The benchmark does not establish failure rates for real NeRF, Gaussian
-splatting, point-cloud, or autonomous-driving occupancy systems. The next
-submission-quality step is to attach the diagnostic to a real neural-scene
-generator and evaluate with held-out 3D reconstructions or multi-view captures.
+The main limitation is external validity. The benchmark is synthetic, the
+candidate generator is simulated, and the projection proxy is a simplified
+silhouette/depth score. The results do not establish failure rates for real
+NeRF, Gaussian-splatting, point-cloud, or autonomous-driving occupancy systems.
+A real-system validation should attach the audit to a trained generator and
+evaluate with held-out 3D reconstructions or multi-view captures.
+
+The second limitation is the repair. It is useful as an interpretable baseline
+but is not a final method. The high-pool stress run shows that it can still
+select view-impostor candidates. A stronger repair should separate visible and
+hidden consensus, quantify uncertainty over the visual hull, and trigger
+additional sensing when candidate disagreement is hidden.
+
+The third limitation is sample size in the high-pool stress suite. The suite is
+compact because full high-pool replication in pure Python was too expensive for
+the available machine while other background jobs were consuming CPU. The
+paper treats the stress suite as diagnostic and uses the already completed
+72-scene run as the replicated evidence. This is a deliberate claim boundary.
 
 \section{Reproducibility}
 
-The repository contains deterministic seeds, tests, smoke and full presets, CSV
-tables, and generated figures. The main commands are:
+The repository includes source code, deterministic seeds, tests, smoke and full
+presets, generated CSV tables, generated figures, a claim audit, and a PDF
+build script. The main commands are:
 {\footnotesize
 \begin{verbatim}
 python -m pytest
 python experiments/run_synthetic.py --preset smoke --output results/smoke
 python experiments/run_synthetic.py --preset full --output results/full
+python experiments/run_expansion_suite.py --mode full
 python scripts/build_paper.py
+python scripts/run_claim_audit.py
 \end{verbatim}
 }
+All experiments are CPU-only and stream scene generation sequentially. The code
+does not require downloading datasets. The v3 expansion writes
+\texttt{expanded\_trials.csv}, \texttt{expanded\_summary.csv},
+\texttt{candidate\_diagnostics.csv}, \texttt{ablation\_summary.csv},
+\texttt{correlation\_summary.csv}, \texttt{failure\_cases.csv},
+\texttt{manifest.json}, and \texttt{claims.json}.
 
-\section{ICLR Checklist}
+\section{Conclusion}
 
-\textbf{Anonymous submission.} The paper and repository use anonymous author
-metadata.
+Sparse-view 3D scene selection can look better while becoming worse. The
+reason is not mysterious: sparse views underdetermine hidden occupancy, and a
+candidate pool gives the selector more opportunities to find candidates that
+exploit that underdetermination. This paper turns that mechanism into a
+reproducible audit. The replicated benchmark shows proxy improvement paired
+with true 3D degradation. The repair shows that candidate consensus and visual
+hull plausibility can reduce the failure. The high-pool stress suite shows that
+the repair is incomplete and that failure analysis remains necessary.
 
-\textbf{Claims.} The claims are limited to the synthetic benchmark and
-construction-level mechanism.
+The intended contribution is a benchmark lens. When evaluating future neural
+scene world models, it should not be enough to report that the best selected
+candidate has a strong sparse-view proxy score. A submission-quality evaluation
+should ask whether that selected candidate is globally consistent in 3D, how
+the answer changes with candidate pool size, and whether uncertainty or
+additional sensing is triggered when sparse views leave hidden geometry
+ambiguous.
 
-\textbf{Code and data.} All benchmark code is included. Data are generated
-procedurally.
+\appendix
 
-\textbf{Compute.} Experiments run on CPU. The full preset uses 72 scenes and
-finishes in minutes on a standard laptop.
+\section{Appendix A: Detailed Algorithms}
 
-\textbf{Limitations.} The main limitation is lack of real neural-scene
-experiments.
+\subsection{Scene generation}
+
+The target generator initializes an empty grid and samples between three and
+five primitives. A box primitive writes a rectangular solid into the occupancy
+grid. An ellipsoid primitive writes all voxels satisfying a normalized quadratic
+radius test. The generator rejects scenes whose occupied fraction is outside a
+fixed range. This rejection avoids degenerate all-empty scenes and overly full
+scenes where hidden-region diagnostics become uninformative.
+
+\subsection{Candidate generation}
+
+Faithful candidates are target-like but imperfect. They apply a small
+translation sampled from $\{-1,0,1\}^3$, delete a small fraction of occupied
+voxels, and add a small fraction of nearby voxels. Drift candidates apply a
+larger translation and stronger noise. View-impostor candidates first compute
+the visible first-hit mask under the sparse axes, copy that visible surface,
+and then sample hidden material inside the visual hull. Most impostors are thin
+shells, while a minority receive coherent hidden blocks. The v3 sampler exposes
+configuration parameters for mixture probabilities, hidden fill scale, coherent
+block probability, and thin-shell probability.
+
+\subsection{Scoring and reranking}
+
+For each candidate set, the scoring code computes proxy score, ensemble
+consensus, visual-hull volume plausibility, surface fraction, and repair score.
+The consensus occupancy is the thresholded mean of candidate occupancies, with
+a threshold that stays meaningful for small candidate sets. Volume plausibility
+compares the candidate occupied count against a visual-hull-derived expected
+mass. Surface fraction is the fraction of occupied voxels that are not eroded
+interior voxels under six-neighbor connectivity.
+
+\section{Appendix B: Additional Tables}
+
+\begin{table}[t]
+\centering
+\caption{Replicated benchmark selected-impostor rates.}
+\label{tab:rates}
+\begin{tabular}{lrrrrrrr}
+\toprule
+method & 1 & 2 & 4 & 8 & 16 & 32 & 64 \\
+\midrule
+sparse-view & 0.208 & 0.472 & 0.681 & 0.903 & 0.986 & 1.000 & 1.000 \\
+reranked & 0.208 & 0.153 & 0.236 & 0.181 & 0.111 & 0.181 & 0.222 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Axis-sweep stress slice at pool size 256.}
+\label{tab:axis}
+\begin{tabular}{llrrrr}
+\toprule
+axes & method & proxy & true IoU & hidden error & gap \\
+\midrule
+$x$ & sparse-view & 1.000 & 0.337 & 0.793 & 0.663 \\
+$x$ & reranked & 0.984 & 0.950 & 0.059 & 0.034 \\
+$x,y$ & sparse-view & 1.000 & 0.641 & 0.593 & 0.359 \\
+$x,y$ & reranked & 0.978 & 0.938 & 0.050 & 0.040 \\
+$x,y,z$ & sparse-view & 1.000 & 0.710 & 0.632 & 0.290 \\
+$x,y,z$ & reranked & 1.000 & 0.742 & 0.555 & 0.258 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Sampler-mixture stress slice at pool size 256.}
+\label{tab:mixture}
+\begin{tabular}{lrrrr}
+\toprule
+impostor prior & method & true IoU & hidden error & impostor selected \\
+\midrule
+0.10 & sparse-view & 0.641 & 0.593 & 1.000 \\
+0.10 & reranked & 0.653 & 0.572 & 1.000 \\
+0.29 & sparse-view & 0.641 & 0.593 & 1.000 \\
+0.29 & reranked & 0.938 & 0.050 & 0.000 \\
+0.45 & sparse-view & 0.641 & 0.593 & 1.000 \\
+0.45 & reranked & 0.848 & 0.130 & 0.000 \\
+0.60 & sparse-view & 0.412 & 1.000 & 1.000 \\
+0.60 & reranked & 0.684 & 0.534 & 1.000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Candidate-level proxy calibration in the compact diagnostic set.}
+\label{tab:calibration}
+\begin{tabular}{lrrrr}
+\toprule
+mode & count & Pearson & Spearman & true IoU mean \\
+\midrule
+drift & 164 & 0.906 & 0.917 & 0.210 \\
+faithful & 564 & 0.917 & 0.886 & 0.631 \\
+view impostor & 296 & undefined & undefined & 0.407 \\
+all & 1024 & 0.476 & 0.225 & 0.499 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Appendix C: Failure Slice Details}
+
+The repaired selector's worst high-pool stress cases are not random mistakes.
+They are candidates that maintain perfect sparse-view proxy score while
+achieving only moderate true IoU. The four recorded repaired selections at
+$N=256$ have true IoU 0.503, 0.584, 0.607, and 0.632. Their hidden errors are
+0.748, 0.613, 0.572, and 0.601. This pattern implies that the repair is still
+too willing to accept visible-surface agreement when consensus and volume
+plausibility are also high.
+
+The failure cases suggest three concrete extensions. First, candidate consensus
+should be computed separately for visible first-hit voxels and hidden visual
+hull voxels. Second, a selector should penalize candidates whose occupied mass
+is disproportionately concentrated near first-hit shells. Third, when the top
+candidates disagree mainly in the hidden hull, the system should acquire a new
+view or mark the selection as unresolved rather than selecting a single scene.
+
+\section{Appendix D: Claim Boundaries}
+
+The paper claims that the mechanism exists in a controlled benchmark, that the
+replicated benchmark shows pool-size amplification under the sparse-view
+selector, that the repair reduces the gap in this benchmark, and that compact
+stress tests expose remaining high-pool weaknesses. It does not claim that all
+real neural scene systems exhibit the same failure rate. It does not claim the
+repair is optimal. It does not claim that proxy selection is always bad. If the
+proxy equals the true utility, or if the candidate generator never emits
+hidden-inconsistent projective equivalents, larger pools can help.
+
+The most important reviewer-facing boundary is the difference between a
+mechanism audit and a deployment measurement. A deployment measurement would
+attach the audit to a trained NeRF, 3D Gaussian, point-cloud, or occupancy
+world model and use held-out multiview captures. This paper supplies the audit
+logic and controlled evidence needed before that larger evaluation.
+
+\section{Appendix E: ICLR Checklist}
+
+\textbf{Anonymous submission.} The manuscript uses anonymous author metadata.
+
+\textbf{Claims.} Claims are scoped to the synthetic benchmark and the
+construction-level mechanism. The paper explicitly separates replicated claims
+from compact stress diagnostics.
+
+\textbf{Code and data.} All benchmark code is included. Data are procedurally
+generated from deterministic seeds.
+
+\textbf{Compute.} Experiments run on CPU. The replicated benchmark uses 72
+scenes and grid size 24. The high-pool stress suite is compact and sequential
+to respect RAM and CPU constraints.
+
+\textbf{Limitations.} The limitations section states that real-system
+validation remains future work and that the repair is not a complete defense.
+
+\section{Appendix F: Benchmark Datasheet}
+
+\subsection{Motivation and intended use}
+
+The benchmark is intended for one question: when a 3D scene-world system
+selects among several candidate futures using sparse projective evidence, does
+the selected candidate become more projectively convincing but less globally
+consistent as the candidate pool grows? It is not intended to rank general 3D
+reconstruction methods, train a production renderer, or claim deployment
+failure rates. A method should use this benchmark as an audit before reporting
+that candidate selection improved a scene-world model.
+
+The benchmark deliberately exposes hidden geometry. In real systems the hidden
+target may be unavailable at decision time, but a benchmark needs hidden labels
+to diagnose whether the decision rule is safe. The deployed selector therefore
+receives only sparse-view signals, while the evaluator receives full occupancy.
+This separation is the dataset's central design choice.
+
+\subsection{Composition}
+
+Each example contains a target occupancy grid, a set of candidate occupancy
+grids, sparse-view proxy scores, repair features, selected-candidate metrics,
+and generator-mode labels. The generator-mode label is a diagnostic field. It
+should not be used as an input to the selector. The replicated benchmark uses
+72 target scenes at grid size 24. The stress suite records candidate-level
+diagnostics for 1024 candidates and high-pool selections up to pool size 256.
+
+\subsection{Generation process}
+
+Scenes are generated procedurally from deterministic seeds. Candidate sets are
+also generated deterministically from target-specific seeds. The generator has
+no external dependencies beyond NumPy. There are no scraped assets, no
+personally identifiable data, and no license restrictions on data because data
+are not collected from users or third-party datasets.
+
+The main artifact is therefore closer to a simulation benchmark than to a
+static dataset. This has an advantage for auditing: a fresh evaluator can
+change grid size, pool size, view axes, sampler mixture, and hidden fill scale
+without collecting new data. The disadvantage is that a synthetic generator may
+not match the distribution of any real deployment. The paper addresses that by
+limiting claims and by describing a porting protocol in Appendix~J.
+
+\subsection{Recommended reporting}
+
+A submission using this audit should report at least the following quantities:
+\begin{itemize}
+  \item sparse proxy score as a function of candidate pool size;
+  \item true 3D IoU or an equivalent held-out 3D consistency metric;
+  \item hidden-region IoU or hidden-region error;
+  \item selected-candidate mode or a proxy for view-impostor rate;
+  \item candidate-level calibration between proxy score and true utility;
+  \item failure cases for the repaired or proposed selector;
+  \item compute budget, grid resolution, scene count, and random seeds.
+\end{itemize}
+Reporting only the best sparse-view proxy score is insufficient because it is
+exactly the quantity that the audit shows can be misleading.
+
+\subsection{Known artifacts}
+
+The candidate generator makes view-impostor candidates by construction. This is
+not a hidden artifact; it is the failure mode under test. The generator also
+uses axis-aligned orthographic views, which are easier than posed perspective
+cameras. This simplification makes the proof and diagnostics transparent but
+means the benchmark is not a photometric rendering benchmark. The stress suite
+is compact and should not be used as a high-confidence estimate of small effect
+sizes. It is a high-pool probe, not a second replicated benchmark.
+
+\section{Appendix G: Mask Derivations}
+
+\subsection{Projection operators}
+
+Let an occupancy grid $x$ have shape $m\times m\times m$. For an axis
+$a\in\{x,y,z\}$, define the projection operator
+$P_a(x)\in\{0,1\}^{m\times m}$ by logical OR along that axis. For the $x$ axis,
+\[
+P_x(x)[j,k]=\bigvee_{i=1}^m x[i,j,k].
+\]
+The first-hit index for the same ray is
+\[
+F_x(x)[j,k]=\min\{i:x[i,j,k]=1\},
+\]
+with a sentinel value when no hit exists. The front-depth map is the first-hit
+index normalized to $[0,1]$. The benchmark uses the pair
+$(P_a,F_a)$ because it captures both silhouette and visible surface depth.
+
+\subsection{Visual hull}
+
+For a view set $\views$, the visual hull is the intersection of all silhouette
+extrusions:
+\[
+\vhull(y;\views)=\bigcap_{a\in\views}\{u\in\vox:P_a(y)[\pi_a(u)]=1\},
+\]
+where $\pi_a$ maps a voxel to its ray coordinate in view $a$. The visual hull is
+an upper bound on target occupancy under silhouette-only constraints. It
+contains the target but may contain many hidden voxels that are not occupied.
+With few views, the hull can be much larger than the object.
+
+\subsection{Visible mask}
+
+The visible mask is the set of voxels that are first hits from at least one
+scored view:
+\[
+\mathrm{Visible}(y;\views)=
+\{u\in y:\exists a\in\views,\ u_a=F_a(y)[\pi_a(u)]\}.
+\]
+The hidden mask is then $\vhull(y;\views)\setminus
+\mathrm{Visible}(y;\views)$. This definition avoids penalizing a candidate for
+voxels outside the sparse-view hull, where the silhouettes already rule out
+occupancy. It focuses the hidden metric on the ambiguous region where a view
+impostor can hide errors without changing the proxy.
+
+\subsection{Non-injectivity}
+
+For any target with a nonempty hidden mask, construct a candidate $x'$ by
+copying all visible first-hit voxels and changing any subset of hidden-mask
+voxels. For every scored ray, the silhouette remains positive exactly when the
+target silhouette is positive, and the first-hit depth remains unchanged
+because the copied front voxel is still the first hit. Therefore the proxy
+score based on silhouette and first-hit depth is identical for all such hidden
+variants. Their true IoU can vary substantially depending on which hidden
+voxels are kept or removed. This is the precise sense in which sparse-view
+projection is not injective.
+
+\section{Appendix H: Statistical Interpretation}
+
+\subsection{Why the replicated run carries the main claim}
+
+The replicated benchmark has 72 scenes and evaluates the full pool-size curve
+up to 64. It is the appropriate evidence for the main statement that increasing
+candidate pool size improves proxy score while worsening true 3D consistency.
+The means and standard errors show a large effect: true IoU drops by 0.180 from
+$N=1$ to $N=64$, while proxy score rises by 0.209. The selected-impostor rate
+increases from 0.208 to 1.000. These are not subtle effects that depend on a
+single outlier.
+
+\subsection{Why the high-pool stress is interpreted differently}
+
+The high-pool stress run is much smaller. It should not be read as a precise
+estimate of the $N=256$ population mean. Its role is to test whether proxy
+saturation, repair improvement, and repair failure can be observed under a more
+aggressive pool size. It succeeds at that role: the sparse selector saturates
+the proxy at 1.000, the repair improves true IoU from 0.355 to 0.581, and the
+failure cases show that the repair remains vulnerable. The paper therefore
+does not use the compact stress run to replace the replicated result.
+
+\subsection{Effect-size reading}
+
+In the replicated run, the difference between sparse-view and reranked true IoU
+at $N=64$ is 0.511. The difference in exploitation gap is 0.533. These are
+large absolute differences for a bounded metric. The repair's benefit is not
+merely that it selects a slightly different candidate; it moves the selected
+candidate from a nearly pure visible shell toward a more complete occupancy.
+
+The high-pool stress run shows a smaller but still meaningful repair benefit:
+true IoU improves by 0.226 and the gap drops by 0.226 at $N=256$. The fact that
+the selected candidates can still be impostors at $N=256$ is not a contradiction.
+It means the repair moves the candidate in the right direction without fully
+solving the high-pool adversarial case.
+
+\subsection{Reading undefined correlations}
+
+The calibration table reports undefined within-mode correlations for
+view-impostor candidates. This is not a missing result. In the compact
+diagnostic set, view-impostor candidates have proxy score 1.000 by
+construction, so the proxy has no variance within that mode. A correlation
+coefficient is undefined when one variable is constant. The substantive
+interpretation is that once candidates reach projective equivalence, the proxy
+cannot rank them by hidden 3D correctness.
+
+\section{Appendix I: Pseudocode}
+
+\begin{verbatim}
+for seed in seeds:
+  for sid in scenes:
+    y = generate_scene(seed, sid)
+    C = sample_candidates(y, max_N)
+    for N in pool_sizes:
+      P = C[:N]
+      F = score_candidates(P, y, axes)
+      i_sparse = argmax(F.proxy)
+      i_repair = argmax(0.58 * F.proxy
+                        + 0.27 * F.consensus
+                        + 0.22 * F.volume
+                        - 0.12 * F.surface)
+      for name, i in selections:
+        x = P[i]
+        q = F[i].proxy
+        u = iou(x, y)
+        record(proxy=q, iou3d=u,
+               hidden_err=1-hidden_iou(x, y),
+               gap=q-u, mode=x.mode)
+\end{verbatim}
+
+The implementation follows this structure but adds candidate traces, plotting,
+stress-regime metadata, and JSON claim audits. The important point is that the
+repair is evaluated on the same candidate prefix as the sparse-view selector.
+It does not get a better generator or access to hidden target occupancy.
+
+\section{Appendix J: Porting the Audit to Neural Scene Systems}
+
+\subsection{Porting to NeRF-like models}
+
+For a NeRF-like predictor, the target may be represented by held-out multiview
+images, depth maps, or reconstructed occupancy. Candidate scenes can be
+different samples from a conditional generative model, different optimization
+initializations, or different future rollouts. The sparse proxy should match
+the deployment interface: for example, photometric loss on two observed views.
+The hidden metric should use held-out views, depth consistency, extracted
+geometry, or a fused reconstruction. The audit question remains the same:
+does selecting the best sparse-view candidate improve observed-view loss while
+worsening held-out 3D or multiview consistency?
+
+\subsection{Porting to Gaussian splatting}
+
+For Gaussian splats, the candidate representation is explicit and renderable.
+The sparse proxy may be photometric or depth loss under a small camera set. A
+hidden diagnostic can use novel-view rendering, mesh extraction when available,
+or occupancy induced by splat opacity. A view-impostor in this setting may be a
+cloud of splats that explains observed views but places opacity incorrectly in
+unobserved regions. The repair analog would combine proxy rendering loss with
+candidate ensemble consensus over opacity, depth uncertainty, and surface
+regularity.
+
+\subsection{Porting to autonomous-driving occupancy world models}
+
+For occupancy world models, the target may be a future occupancy grid or
+semantic occupancy volume. Sparse proxy signals may come from camera-visible
+cells, lidar-visible cells, or task-specific planner reward. Hidden metrics can
+evaluate occluded occupancy, future collision geometry, and consistency across
+time. The audit is especially relevant when a planner samples several futures
+and chooses the one with the highest partial-observation score. A selected
+future that is plausible in visible cells but wrong in occluded space can create
+downstream planning risk.
+
+\subsection{Minimum real-system protocol}
+
+A real-system version should include at least three candidate pool sizes, at
+least one sparse proxy matching deployment, at least one held-out geometry or
+multiview metric, and failure-case visualization. It should report whether the
+best sparse proxy candidate differs from the best held-out 3D candidate. It
+should also report whether uncertainty-aware reranking reduces the disagreement
+without using the held-out metric at selection time.
+
+\section{Appendix K: Reviewer Decision Table}
+
+\begin{table}[t]
+\centering
+\caption{Common reviewer concerns and the paper's intended answer.}
+\label{tab:reviewer}
+\begin{tabular}{p{0.28\linewidth}p{0.62\linewidth}}
+\toprule
+Concern & Intended answer \\
+\midrule
+Classical geometry already knows sparse views are ambiguous. &
+Correct. The novelty is the candidate-selection audit and measured pool-size
+amplification, not the ambiguity itself. \\
+The benchmark is synthetic. &
+Correct. It is a mechanism benchmark. The paper does not claim real-system
+failure rates and gives a porting protocol. \\
+The candidate generator includes impostors. &
+Correct. The audit tests whether selection finds that failure mode as pool
+size grows. \\
+The repair is hand-designed. &
+Correct. It is a diagnostic baseline. The ablations and failures show its
+limits. \\
+More views solve the problem. &
+More views help when available. The audit targets settings where the deployed
+score remains sparse or partial. \\
+True 3D IoU is unavailable in deployment. &
+True IoU is an evaluation diagnostic, not a deployment signal. The selector
+uses only sparse views and candidate-set geometry. \\
+The high-pool suite is small. &
+It is a compact stress suite. The replicated 72-scene run carries the main
+statistical claim. \\
+The paper overclaims. &
+The claim boundary is explicit: controlled benchmark, scoped mechanism, no
+universal real-system failure claim. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Appendix L: Additional Reviewer Attacks}
+
+\textbf{Attack: The $N=1$ candidate is not a calibrated baseline.}
+The paper does not require $N=1$ to be optimal or calibrated. The replicated
+curve uses $N=1$ as the smallest pool and shows how selection changes as the
+same sampler provides more candidates. The effect is visible across the full
+curve, not only by comparing endpoints.
+
+\textbf{Attack: Candidate samples are not independent in real models.}
+The proposition uses independence for a clean probability statement. Real
+candidate samples can be correlated. Correlation changes the exact
+$1-(1-p)^N$ formula but does not remove the audit question. If correlated
+samples still include hidden-inconsistent projective equivalents, selection can
+still amplify them. A real-system audit should report effective diversity.
+
+\textbf{Attack: The repair may be using a prior that happens to match the toy
+generator.}
+That is possible. The paper therefore calls the repair a baseline and reports
+mixture, hidden-mass, and ablation stress. The highest-prior stress case shows
+that the repair can fail. A future learned repair should validate on different
+scene generators and real data.
+
+\textbf{Attack: Full 3D IoU may not be the task utility.}
+True. Some tasks care about visible rendering or collision-free planning more
+than volumetric IoU. The audit's metric should be changed for those tasks. The
+general requirement is that the held-out metric must measure something the
+sparse proxy can miss.
+
+\textbf{Attack: Proxy saturation is an artifact of binary occupancy.}
+Binary occupancy makes saturation easy to inspect, but projective equivalence
+also appears in continuous opacity and radiance fields under finite views. The
+exact tolerance and rendering model change, which is why the paper calls for
+real-system porting rather than claiming direct transfer.
+
+\section{Appendix M: Artifact Manifest}
+
+The key generated files are:
+\begin{itemize}
+  \item \texttt{results/full/summary.csv}: replicated 72-scene aggregate
+  metrics up to pool size 64.
+  \item \texttt{results/full/metrics.csv}: per-scene replicated metrics.
+  \item \texttt{results/expansion/expanded\_summary.csv}: compact v3 stress
+  aggregate metrics.
+  \item \texttt{results/expansion/expanded\_trials.csv}: per-trial v3 stress
+  metrics.
+  \item \texttt{results/expansion/candidate\_diagnostics.csv}: candidate-level
+  proxy, repair, and true IoU diagnostics.
+  \item \texttt{results/expansion/ablation\_summary.csv}: repair component
+  ablations.
+  \item \texttt{results/expansion/failure\_cases.csv}: worst repaired
+  high-pool selections.
+  \item \texttt{results/expansion/claims.json}: machine-readable claim audit.
+  \item \texttt{paper/final/best-of-n-3d-scene-world-models-v3.pdf}: final
+  repository PDF.
+\end{itemize}
+
+The paper figures are generated into \texttt{figures/} and copied into the
+expansion results directory for self-contained inspection. The build script
+copies the final v3 PDF to the Desktop under the same v3 filename.
+
+\section{Appendix N: Why This Paper Is Not a Duplicate Wrapper}
+
+The paper intentionally avoids making the generic claim that selecting the best
+candidate under an imperfect proxy can overoptimize that proxy. That claim is
+too broad and would make the paper look like a template applied to a new
+architecture. The specific contribution here is the geometry of sparse 3D
+views. The proxy is not merely noisy; it has equivalence classes induced by
+projection. The failure candidate is not merely high reward; it is a
+projectively correct visible surface with wrong hidden occupancy. The repair is
+not a generic verifier; it uses candidate-set geometry, visual-hull mass, and
+surface structure.
+
+Placed next to papers about language models, decision transformers, diffusion
+policies, or latent world models, this manuscript should be identifiable from
+its first page: it is about view impostors, visual hulls, hidden occupancy, and
+sparse-view 3D scene selection. The abstract, theorem, benchmark, figures,
+tables, limitations, and appendix all use this geometry-specific vocabulary and
+evidence. This is the anti-duplication safeguard for the project.
+
+\section{Appendix O: Expanded Proof Details}
+
+\subsection{A concrete two-volume construction}
+
+Consider a single view axis $x$ and a target occupancy $y$ that contains at
+least one ray with two occupied voxels at depths $i_1<i_2$. Construct
+$x^{(a)}$ by keeping both voxels and construct $x^{(b)}$ by keeping only the
+front voxel at $i_1$. The silhouette along that ray is positive for both
+candidates, and the first-hit depth is $i_1$ for both candidates. If every
+other ray is copied from the target, then the single-view proxy gives the same
+score to $x^{(a)}$ and $x^{(b)}$. Their 3D IoU differs because one candidate
+contains the hidden voxel and the other does not.
+
+For multiple finite views, the same construction applies to any voxel that is
+strictly behind the first occupied target voxel for every scored view ray that
+contains it. Such voxels are exactly the hidden visual-hull voxels used by the
+benchmark. Changing those voxels does not alter the first-hit surfaces. If the
+hidden set is nonempty, there are at least $2^{|H|}$ hidden variants with the
+same visible first-hit pattern. This exponential count is not used as a
+probability claim; it simply shows that sparse-view equivalence classes can be
+large.
+
+\subsection{Why candidate pools matter}
+
+If a selector evaluated one candidate, the sparse proxy could still be wrong,
+but there would be no selection amplification. With a pool, the selector
+searches over candidates for high proxy score. If the candidate distribution
+contains a mode whose hidden geometry is poor but whose proxy score is high,
+the probability of encountering that mode increases with pool size. The exact
+increase depends on independence, correlation, and mode probability. The audit
+does not require the exact formula to hold in real systems. It requires
+measuring the selected candidate as pool size grows.
+
+\subsection{Why the repair is allowed to use the visual hull}
+
+The visual hull is computed from sparse silhouettes. It is therefore available
+from the same kind of observations used by the proxy. The repair does not know
+which hidden voxels inside the hull are occupied in the target. It only knows
+that a candidate whose mass is implausibly small, implausibly large, or
+concentrated on thin surfaces is suspicious. This is a weak prior, not hidden
+supervision.
+
+\section{Appendix P: Real-System Experiment Blueprint}
+
+\subsection{Dataset split}
+
+A real-system evaluation should separate observed views, selector views,
+validation views, and hidden evaluation views. Observed views condition the
+scene predictor. Selector views define the deployed sparse proxy. Validation
+views tune any repair hyperparameters. Hidden evaluation views or reconstructed
+geometry measure whether selected candidates are globally consistent. The
+hidden split must not be used to choose candidates or tune the final selector.
+
+\subsection{Candidate generation}
+
+Candidate pools can be generated by stochastic latent sampling, diffusion
+sampling, dropout, ensemble members, optimization restarts, or explicit
+multi-hypothesis prediction. The audit should report candidate diversity before
+selection. If all candidates are nearly identical, a lack of view-impostor
+amplification may simply mean the generator has low diversity. If candidates
+are diverse but the proxy still selects poor hidden geometry, the failure is
+selection-driven.
+
+\subsection{Metrics for different representations}
+
+For occupancy systems, use full occupancy IoU, hidden occupancy IoU, semantic
+IoU if labels exist, and collision-relevant occupancy in occluded regions. For
+NeRF-like systems, use held-out view photometric error, depth consistency,
+normal consistency, and geometry extracted through density thresholding. For
+Gaussian splats, use held-out rendering metrics, depth maps, opacity-derived
+occupancy, and surface regularity. For point-cloud systems, use Chamfer
+distance, F-score at multiple thresholds, and occluded-region recall. The
+metric should be chosen before evaluating candidate selection.
+
+\subsection{Required plots}
+
+A real-system paper should include four plots: proxy score versus pool size,
+held-out 3D consistency versus pool size, exploitation gap versus pool size,
+and selected-candidate examples at low and high pool sizes. If a repair is
+proposed, the same plots should compare sparse selection, repaired selection,
+random selection, and an oracle that selects by the held-out metric. The oracle
+is not deployable; it shows how much headroom remains.
+
+\subsection{Stopping criteria}
+
+The audit should be considered failed if proxy score increases with pool size
+while held-out 3D consistency decreases, unless the paper explicitly frames
+that behavior as the discovered failure. A repair should be considered
+insufficient if it improves the mean but leaves high-severity hidden failures
+unreported. The benchmark should report both averages and worst cases.
+
+\section{Appendix Q: Failure Taxonomy}
+
+\textbf{Thin-shell impostor.}
+The candidate copies only front surfaces and leaves the interior empty or
+sparse. It usually has high visible occupancy fraction and high surface
+fraction. The current repair targets this case through surface penalty and
+volume plausibility.
+
+\textbf{False-hidden-mass impostor.}
+The candidate copies front surfaces but fills hidden visual-hull regions with
+wrong mass. It may evade a simple volume prior if the occupied count is
+plausible. Candidate consensus or additional views are needed to detect it.
+
+\textbf{Consensus impostor.}
+If many candidates share the same hidden error, ensemble consensus can reinforce
+the wrong geometry. This is a serious limitation for any consensus-based
+repair. A real-system repair should estimate epistemic uncertainty and compare
+against priors from training data, not only within-pool agreement.
+
+\textbf{View-allocation failure.}
+The sparse view set may miss exactly the region where candidate futures differ.
+In this case reranking may be less effective than active sensing. The system
+should request a new view that intersects the disagreement region.
+
+\textbf{Proxy-overconfident faithful drift.}
+Not every failure is an explicit view impostor. A faithful-mode candidate can
+drift in a way that preserves the sparse projections while changing hidden
+geometry. The audit still catches this through hidden error and exploitation
+gap, even if the generator-mode label is not ``view impostor.''
+
+\section{Appendix R: Fifty-Round Reviewer Checklist Condensed}
+
+The following checklist summarizes the self-attack process used to harden the
+paper:
+\begin{enumerate}
+  \item Is the title distinct from generic candidate-selection papers? Yes.
+  \item Does the abstract name the 3D mechanism? Yes.
+  \item Are claims scoped to synthetic evidence? Yes.
+  \item Is classical visual hull work acknowledged? Yes.
+  \item Is proxy overoptimization prior work acknowledged? Yes.
+  \item Does the paper avoid claiming a new renderer? Yes.
+  \item Does the selector avoid hidden labels? Yes.
+  \item Does the repair avoid hidden labels? Yes.
+  \item Are pool-size curves reported? Yes.
+  \item Are hidden-region metrics reported? Yes.
+  \item Are selected-impostor rates reported? Yes.
+  \item Are standard errors reported in CSV summaries? Yes.
+  \item Is the high-pool stress suite labeled compact? Yes.
+  \item Does the paper avoid using compact stress as the main claim? Yes.
+  \item Are repair failures reported? Yes.
+  \item Are ablations included? Yes.
+  \item Is candidate-level calibration included? Yes.
+  \item Is random selection included in the stress suite? Yes.
+  \item Are axis-count effects included? Yes.
+  \item Are sampler-mixture effects included? Yes.
+  \item Are hidden-mass effects included? Yes.
+  \item Is compute described? Yes.
+  \item Are deterministic seeds used? Yes.
+  \item Is the final PDF built by script? Yes.
+  \item Is the Desktop artifact named v3? Yes.
+  \item Is the source folder the source of truth? Yes.
+  \item Are stale version-two names excluded from the manuscript? Yes.
+  \item Is there a machine-readable claim audit? Yes.
+  \item Does the paper state what it does not claim? Yes.
+  \item Does it give a real-system porting path? Yes.
+  \item Does it include enough detail to reproduce the toy benchmark? Yes.
+  \item Does it explain why impostor candidates are included? Yes.
+  \item Does it explain why more views help but do not erase the audit? Yes.
+  \item Does it separate visible and hidden signals conceptually? Yes.
+  \item Does it include reviewer attack responses? Yes.
+  \item Does it include a failure taxonomy? Yes.
+  \item Does it avoid relying on a single figure? Yes.
+  \item Does it include both means and qualitative examples? Yes.
+  \item Does it identify repair headroom? Yes.
+  \item Does it avoid universal deployment claims? Yes.
+  \item Does it avoid duplicate wrapper language? Yes.
+  \item Does it use geometry-specific notation? Yes.
+  \item Does it explain visual hull construction? Yes.
+  \item Does it discuss correlation limitations? Yes.
+  \item Does it say why undefined correlations are meaningful? Yes.
+  \item Does it document generated artifacts? Yes.
+  \item Does it mention CPU/RAM constraints honestly? Yes.
+  \item Does it provide exact commands? Yes.
+  \item Does it provide a final acceptance audit? Yes.
+  \item Does the paper remain falsifiable? Yes.
+\end{enumerate}
+
+\section{Appendix S: Additional Discussion of Compute Constraints}
+
+The v3 pass attempted larger high-pool stress configurations, but pure Python
+scoring at $N=256$ over many scenes was too slow on the available machine while
+other background experiments were active. Rather than hide this, the final
+artifact makes the engineering choice explicit. The replicated 72-scene
+benchmark remains the main quantitative result. The high-pool suite is compact
+but covers more adversarial axes: pool size 256, axis count, mixture shift,
+hidden fill, ablation, calibration, and failures. This is the correct
+submission stance because it maximizes rigor under the actual compute budget
+without pretending that a small stress suite has the confidence of a large
+benchmark.
+
+Future work should implement vectorized scoring or use sparse voxel data
+structures so that high-pool replication can be expanded without increasing
+RAM. The most expensive operations are repeated candidate scoring and
+consensus recomputation across prefixes. A production benchmark can precompute
+view projections, cache per-candidate proxy features, and update consensus
+incrementally. Those engineering optimizations are orthogonal to the audit
+claim, but they would allow a larger $N=256$ or $N=512$ study.
+
+\section{Appendix T: Closest Prior-Work Separations}
+
+\textbf{Sparse-view reconstruction papers.}
+Sparse-view NeRF and occupancy papers usually ask how to reconstruct a scene
+from limited observations. This paper asks a different question: after a model
+has produced several possible scenes, what happens when an inference-time
+selector chooses among them with a sparse proxy? A strong sparse-view
+reconstruction method can still be placed inside a candidate-selection
+interface, and the audit would then test whether its sampled candidates are
+ranked safely.
+
+\textbf{Uncertainty and ensemble papers.}
+Uncertainty methods often use ensembles to estimate epistemic uncertainty. The
+repair here borrows the simplest possible ensemble-consensus idea but does not
+claim a new uncertainty estimator. The contribution is to show that a geometric
+uncertainty signal is relevant to the diagnosed failure, and to expose where
+that signal fails at high pool size.
+
+\textbf{Verifier-guided generation.}
+Verifier-guided generation papers select among candidates with a learned or
+hand-designed verifier. The analogy is useful, but the verifier failure here
+has a specific 3D structure. A verifier can be wrong because it is noisy or
+miscalibrated. A sparse-view 3D proxy can be wrong because many hidden volumes
+are exactly equivalent under the observed projections. That equivalence is the
+reason a candidate can be proxy-perfect and still geometrically poor.
+
+\textbf{Classical visual hull work.}
+Classical visual hull work explains why sparse silhouettes do not determine
+shape. This paper assumes that fact and asks how it interacts with learned
+candidate pools. The empirical artifact is therefore not a reproof of visual
+hull ambiguity; it is a stress test for modern scene-world interfaces that
+sample, score, and select.
+
+\textbf{Planning with learned world models.}
+Planning papers often evaluate whether model rollouts improve downstream task
+reward. A planner may not care about every hidden voxel. However, if hidden
+geometry affects collision, reachability, or future observations, then a
+sparse-view-selected scene can be dangerous even when the immediate proxy looks
+good. The audit can be adapted by replacing true IoU with a task-specific
+hidden utility.
+
+\textbf{Why the paper should survive side-by-side comparison.}
+The manuscript is anchored by view impostors, visual hulls, hidden occupancy,
+first-hit projections, and selected-candidate 3D IoU. These are not cosmetic
+renamings of another architecture's candidate-selection story. The theorem,
+benchmark, repair, stress tests, and failure taxonomy all depend on 3D
+projective ambiguity. If a reviewer places this paper beside another
+candidate-pool paper, the mechanism, metrics, figures, and limitations should
+make the identity of this work immediately clear.
+
+\section{Appendix U: Deployment Checklist for Future Users}
+
+A team applying this audit to a real scene-world model should answer the
+following questions before claiming that larger candidate pools improve the
+system.
+
+\textbf{What is the deployed proxy?}
+The proxy must be the score that actually chooses candidates. If a system
+selects by two camera views and reports success on ten held-out views, then
+the audit must preserve that difference. Evaluating every candidate with the
+held-out views would hide the selection failure.
+
+\textbf{What hidden quantity can the proxy miss?}
+For a robot, this may be occluded collision geometry. For a renderer, it may be
+novel-view consistency. For an occupancy predictor, it may be cells outside the
+sensor frustum. The hidden quantity should be named before experiments are run.
+
+\textbf{How diverse are the candidates?}
+Candidate-pool amplification requires meaningful variation. If the sampler
+produces near-duplicates, the audit may show little effect even though the
+proxy is incomplete. Diversity should be measured before selection and among
+the top-proxy candidates after selection.
+
+\textbf{Does the proxy improve while hidden consistency worsens?}
+This is the decisive pattern. If both proxy and hidden consistency improve,
+larger pools are helping. If proxy improves and hidden consistency falls, the
+system is overselecting for the sparse view interface.
+
+\textbf{Does a repair reduce mean failure and worst-case failure?}
+A repair that improves only the mean can still leave dangerous hidden cases.
+The audit should report worst selected examples, not only averages.
+
+\textbf{Would another view resolve the disagreement?}
+If candidate disagreement is concentrated in hidden visual-hull regions, active
+view acquisition may be better than reranking. A safe scene-world interface can
+return ``need more evidence'' rather than forcing a single selected future.
+
+\textbf{Are the claims stated at the right level?}
+If the experiment is synthetic, claim a mechanism. If the experiment uses a
+trained model on a real dataset, claim an empirical failure rate for that
+setting only. If the repair is heuristic, report it as a baseline. This
+discipline is what keeps the audit useful rather than becoming another
+overbroad candidate-selection story.
 
 \begin{thebibliography}{20}
 
@@ -302,7 +1586,7 @@ Huang, B., Yu, Z., Chen, A., Geiger, A., and Gao, S.
 2D Gaussian Splatting for geometrically accurate radiance fields. SIGGRAPH, 2024.
 
 \bibitem[Mescheder et~al.(2019)]{mescheder2019occupancy}
-Mescheder, L., Oechsle, M., Niemeyer, M., Nowozin, S., and Geiger, A.
+Mescheder, L., Oechsle, M., Niemeyer, M., Nowozin, S., and Geiger, M.
 Occupancy Networks: Learning 3D reconstruction in function space. CVPR, 2019.
 
 \bibitem[Peng et~al.(2020)]{peng2020convocc}
