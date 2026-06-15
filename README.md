@@ -23,14 +23,15 @@ python -m pytest
 python experiments/run_synthetic.py --preset smoke --output results/smoke
 python experiments/run_synthetic.py --preset full --output results/full
 python experiments/run_expansion_suite.py --mode full --output results/expansion
+python -m experiments.run_modelnet10_benchmark
 python scripts/build_paper.py
 python scripts/run_claim_audit.py
 ```
 
 The paper build script writes:
 
-- `paper/final/best-of-n-3d-scene-world-models-v3.pdf`
-- `C:\Users\wangz\OneDrive\Desktop\best-of-n-3d-scene-world-models-v3.pdf`
+- `paper/final/best-of-n-3d-scene-world-models-v4.pdf`
+- `C:\Users\wangz\OneDrive\Desktop\best-of-n-3d-scene-world-models-v4.pdf`
 
 ## Repository Layout
 
@@ -39,6 +40,7 @@ The paper build script writes:
 - `tests/`: unit and smoke tests.
 - `docs/`: literature map, novelty decision, reviewer attacks, proof audit, and final audit.
 - `paper/`: anonymous LaTeX submission.
+- `data/modelnet10_tiny/`: tiny ModelNet10-derived voxel slice for the real-shape benchmark tier.
 - `results/`, `figures/`: generated tables and figures.
 
 ## What the Synthetic Benchmark Models
@@ -56,11 +58,13 @@ and surface-complexity penalties. This tests whether a cheap uncertainty and
 coverage signal can reduce proxy exploitation without needing ground-truth
 hidden geometry at test time.
 
-## v3 Submission Artifact
+## v4 Submission Artifact
 
-The v3 manuscript is a 25+ page submission-ready paper. The replicated
+The v4 manuscript is a 25+ page submission-ready paper. The replicated
 72-scene benchmark in `results/full` is the main statistical evidence. The
-compact v3 stress suite in `results/expansion` adds pool-size-256 diagnostics,
+compact stress suite in `results/expansion` adds pool-size-256 diagnostics,
 view-axis stress, sampler-mixture stress, hidden-mass stress, repair ablations,
 candidate-level calibration, failure slices, and a machine-readable
-`claims.json` audit.
+`claims.json` audit. The real-shape tier in `results/modelnet10_benchmark`
+uses a tiny chair/monitor slice derived from ModelNet10 and is required by the
+final claim audit.

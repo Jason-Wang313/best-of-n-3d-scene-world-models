@@ -28,7 +28,7 @@
 
 **Numbers:** Naive proxy score rises from 0.791 at N=1 to 1.000 at N=64. True IoU falls from 0.520 to 0.340. Hidden error rises from 0.442 to 0.929. View-impostor selection rises from 0.208 to 1.000.
 
-**Weakness:** Synthetic distributions are hand-designed. Need real neural-scene validation.
+**Weakness:** Synthetic distributions are hand-designed. The v4 artifact adds a tiny ModelNet10-derived chair/monitor tier, but full trained neural-scene validation remains needed.
 
 ## Empirical Claim D: Repair reduces the exploitation gap
 
@@ -40,9 +40,19 @@
 
 **Weakness:** Repair weights are fixed heuristics and may fail under adversarial candidate sets whose hidden geometry matches the volume/surface priors.
 
+## Empirical Claim E: The real-shape tier preserves the failure pattern
+
+**Claim:** On the tiny ModelNet10-derived chair/monitor tier, naive sparse-view selection improves proxy score while worsening true and hidden 3D consistency, and the reranker recovers much of the lost true IoU.
+
+**Status:** Supported by `results/modelnet10_benchmark/claims.json`.
+
+**Numbers:** Naive proxy score rises from 0.833 at N=1 to 1.000 at N=64. True IoU falls from 0.574 to 0.445, hidden IoU falls from 0.602 to 0.144, and selected-impostor rate rises from 0.188 to 0.938. The reranker recovers true IoU to 0.865 and reduces exploitation gap from 0.555 to 0.101.
+
+**Weakness:** The tier is deliberately tiny and CPU-light. It is not a full ModelNet10 leaderboard or trained NeRF/3DGS evaluation.
+
 ## Claims Excluded
 
 - No claim that all candidate-selection scene-world models fail.
 - No claim that the repair is optimal.
-- No claim that the synthetic benchmark predicts real-world magnitude.
+- No claim that the synthetic benchmark or tiny ModelNet10-derived tier predicts real-world magnitude.
 - No claim that sparse-view regularization papers are insufficient for reconstruction; they address a different training-time problem.

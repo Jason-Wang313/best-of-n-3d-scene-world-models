@@ -49,15 +49,15 @@ The defensible center is narrower: **in learned 3D scene-world candidate selecti
 
 The chosen paper shape is:
 
-mechanism -> diagnostic -> synthetic empirical validation -> uncertainty/coverage-aware repair.
+mechanism -> diagnostic -> replicated synthetic validation -> tiny real-shape stress tier -> uncertainty/coverage-aware repair.
 
 The final claim is architecture-specific but deliberately modest:
 
-> When a 3D scene-world model proposes multiple candidate occupancy/neural-scene futures and a sparse view proxy selects the best candidate, increasing N can monotonically improve the proxy while worsening global 3D consistency, hidden-region IoU, and candidate diversity. A reranker using ensemble consensus and view-coverage plausibility can reduce the exploitation gap in this benchmark.
+> When a 3D scene-world model proposes multiple candidate occupancy/neural-scene futures and a sparse view proxy selects the best candidate, increasing N can monotonically improve the proxy while worsening global 3D consistency, hidden-region IoU, and candidate diversity. A reranker using ensemble consensus and view-coverage plausibility can reduce the exploitation gap in the replicated synthetic benchmark and in a tiny ModelNet10-derived real-shape tier.
 
 ## Open Literature Gaps
 
-- The repo does not yet run on real NeRF, 3DGS, or autonomous-driving occupancy datasets.
+- The repo does not yet run on trained NeRF, 3DGS, or autonomous-driving occupancy datasets; the ModelNet10-derived tier is a tiny voxelized real-shape stress test.
 - The repair is a reranker, not a trained model or representation.
 - The theoretical proposition is diagnostic and construction-based; it is not a distribution-free guarantee for real systems.
 - The literature sweep is broad and linked, but this first pass still needs a human second pass over exact experimental protocols before submission.

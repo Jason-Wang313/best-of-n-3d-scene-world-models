@@ -14,7 +14,7 @@
 
 ## Attack 4: The synthetic scene generator is too simple.
 
-**Answer:** True. The simplicity is a feature for isolating the mechanism, but it is not sufficient for a final empirical claim about real systems. The next step is to port the diagnostic to a NeRF/3DGS or occupancy-world-model benchmark.
+**Answer:** True as a limitation of the main replicated run. The v4 artifact adds a CPU-light ModelNet10-derived chair/monitor voxel tier, so the mechanism is no longer only procedural primitives. Full trained NeRF/3DGS or autonomous-driving occupancy validation remains outside scope.
 
 ## Attack 5: The proxy is unrealistic.
 
@@ -38,4 +38,4 @@
 
 ## Attack 10: This is not enough for ICLR.
 
-**Answer:** As a first autonomous pass, the artifact is runnable and honest. To become a strong submission, it needs real neural-scene experiments, broader baselines, learned uncertainty calibration, and a tighter theoretical statement.
+**Answer:** The v4 artifact is stronger than a synthetic-only pass: it includes a replicated synthetic benchmark, compact high-pool stress suite, ModelNet10 real-shape tier, ablations, calibration diagnostics, and a failing claim audit for unsupported edits. Larger trained neural-scene experiments and learned uncertainty calibration remain the next scope increase.

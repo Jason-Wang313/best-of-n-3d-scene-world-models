@@ -1,5 +1,5 @@
 {
-  "mode": "full-v3",
+  "mode": "full-stress",
   "claim_pass": true,
   "checks": {
     "replicated_baseline_proxy_increases": true,

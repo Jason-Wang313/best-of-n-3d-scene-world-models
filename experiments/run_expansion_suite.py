@@ -48,7 +48,7 @@ PRESETS = {
         stress_n_values=(4, 8),
     ),
     "full": SuiteConfig(
-        mode="full-v3",
+        mode="full-stress",
         main_grid=20,
         main_scenes=4,
         main_seeds=(1729,),
@@ -414,6 +414,7 @@ def _candidate_correlation(candidates: pd.DataFrame) -> pd.DataFrame:
 
 def _claims(summary: pd.DataFrame, ablation: pd.DataFrame, corr: pd.DataFrame, mode: str) -> dict[str, object]:
     main = summary[(summary.regime == "candidate_count") & (summary.axis_label == "xy")]
+    full_stress = mode == "full-stress"
 
     def get(method: str, n: int, column: str) -> float:
         row = main[(main.method == method) & (main.n == n)]
@@ -422,13 +423,13 @@ def _claims(summary: pd.DataFrame, ablation: pd.DataFrame, corr: pd.DataFrame, m
         return float(row.iloc[0][column])
 
     naive_1_proxy = get("naive", 1, "proxy_score_mean")
-    naive_256_proxy = get("naive", 256 if mode == "full-v3" else 8, "proxy_score_mean")
+    naive_256_proxy = get("naive", 256 if full_stress else 8, "proxy_score_mean")
     naive_1_iou = get("naive", 1, "true_iou_mean")
-    naive_256_iou = get("naive", 256 if mode == "full-v3" else 8, "true_iou_mean")
-    naive_256_gap = get("naive", 256 if mode == "full-v3" else 8, "exploitation_gap_mean")
-    repair_256_iou = get("repaired", 256 if mode == "full-v3" else 8, "true_iou_mean")
-    repair_256_gap = get("repaired", 256 if mode == "full-v3" else 8, "exploitation_gap_mean")
-    random_256_iou = get("random", 256 if mode == "full-v3" else 8, "true_iou_mean")
+    naive_256_iou = get("naive", 256 if full_stress else 8, "true_iou_mean")
+    naive_256_gap = get("naive", 256 if full_stress else 8, "exploitation_gap_mean")
+    repair_256_iou = get("repaired", 256 if full_stress else 8, "true_iou_mean")
+    repair_256_gap = get("repaired", 256 if full_stress else 8, "exploitation_gap_mean")
+    random_256_iou = get("random", 256 if full_stress else 8, "true_iou_mean")
 
     baseline_path = ROOT / "results" / "full" / "summary.csv"
     baseline_numbers: dict[str, float] = {}
@@ -463,12 +464,12 @@ def _claims(summary: pd.DataFrame, ablation: pd.DataFrame, corr: pd.DataFrame, m
 
     checks = {
         "replicated_baseline_proxy_increases": baseline_numbers["baseline_naive_n64_proxy"]
-        >= baseline_numbers["baseline_naive_n1_proxy"] + (0.12 if mode == "full-v3" else 0.02),
+        >= baseline_numbers["baseline_naive_n1_proxy"] + (0.12 if full_stress else 0.02),
         "replicated_baseline_true_iou_drops": baseline_numbers["baseline_naive_n64_true_iou"]
-        <= baseline_numbers["baseline_naive_n1_true_iou"] - (0.08 if mode == "full-v3" else -0.05),
+        <= baseline_numbers["baseline_naive_n1_true_iou"] - (0.08 if full_stress else -0.05),
         "n256_proxy_saturates": naive_256_proxy >= 0.98,
-        "n256_repair_beats_naive_true_iou": repair_256_iou >= naive_256_iou + (0.20 if mode == "full-v3" else 0.02),
-        "n256_repair_reduces_gap": repair_256_gap <= naive_256_gap - (0.15 if mode == "full-v3" else 0.01),
+        "n256_repair_beats_naive_true_iou": repair_256_iou >= naive_256_iou + (0.20 if full_stress else 0.02),
+        "n256_repair_reduces_gap": repair_256_gap <= naive_256_gap - (0.15 if full_stress else 0.01),
         "n256_repair_beats_random": repair_256_iou >= random_256_iou,
     }
     corr_all = corr[corr.candidate_mode == "all"].iloc[0]
@@ -679,7 +680,7 @@ def run_suite(config: SuiteConfig, output: Path) -> dict[str, Path]:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run the v3 view-impostor expansion suite.")
+    parser = argparse.ArgumentParser(description="Run the view-impostor expansion suite.")
     parser.add_argument("--mode", choices=sorted(PRESETS), default="full")
     parser.add_argument("--output", type=Path, default=Path("results/expansion"))
     return parser.parse_args()

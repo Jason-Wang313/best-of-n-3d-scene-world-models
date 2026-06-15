@@ -42,4 +42,4 @@ The paper may not yet claim:
 
 - Real NeRF, 3DGS, or autonomous-driving models always exhibit this failure.
 - The repair is optimal or universally reliable.
-- The result is a complete scoped empirical story with real-data validation documented as future work.
+- The result is a complete scoped empirical story with a CPU-light ModelNet10-derived real-shape tier, while full trained neural-scene validation remains future work.

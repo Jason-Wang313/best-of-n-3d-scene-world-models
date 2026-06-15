@@ -1,0 +1,48 @@
+{
+  "all_passed": true,
+  "checks": {
+    "modelnet10_hidden_iou_drops": {
+      "description": "The hidden-region IoU collapses under raw high-N sparse-view selection.",
+      "observed": -0.45822619169257983,
+      "op": "<",
+      "passed": true,
+      "threshold": -0.3
+    },
+    "modelnet10_high_n_selects_impostors": {
+      "description": "Raw high-N sparse-view selection is dominated by view-impostor candidates.",
+      "observed": 0.9375,
+      "op": ">",
+      "passed": true,
+      "threshold": 0.65
+    },
+    "modelnet10_proxy_rises": {
+      "description": "Increasing candidate count raises sparse-view proxy fit on ModelNet10 shapes.",
+      "observed": 0.16698557991016205,
+      "op": ">",
+      "passed": true,
+      "threshold": 0.1
+    },
+    "modelnet10_repair_recovers_true_iou": {
+      "description": "Coverage-aware reranking recovers true 3D IoU over raw high-N selection.",
+      "observed": 0.419970698540023,
+      "op": ">",
+      "passed": true,
+      "threshold": 0.25
+    },
+    "modelnet10_repair_reduces_gap": {
+      "description": "Coverage-aware reranking reduces proxy-versus-true exploitation gap.",
+      "observed": 0.4545467225826787,
+      "op": ">",
+      "passed": true,
+      "threshold": 0.25
+    },
+    "modelnet10_true_iou_drops": {
+      "description": "The same raw selector reduces true 3D IoU.",
+      "observed": -0.12957394863162075,
+      "op": "<",
+      "passed": true,
+      "threshold": -0.08
+    }
+  },
+  "summary": "proxy change 0.167, true-IoU change -0.130, repair gain 0.420."
+}

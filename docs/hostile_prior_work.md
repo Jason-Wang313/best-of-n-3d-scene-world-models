@@ -62,4 +62,4 @@ These are the ten papers or paper families reviewers are most likely to use to a
 
 **Attack:** The empirical evidence is synthetic.
 
-**Response:** This is the strongest limitation. The current artifact is a mechanism paper and reproducible diagnostic, not a full benchmark claim about real NeRF/3DGS deployments. The final audit marks real-system validation as the main missing step.
+**Response:** This remains a key limitation of the replicated backbone, but the v4 artifact is no longer purely procedural: it adds a CPU-light ModelNet10-derived chair/monitor voxel tier. The paper is still a mechanism paper and reproducible diagnostic, not a full benchmark claim about real NeRF/3DGS deployments. The final audit marks trained real-system validation as the main missing step.

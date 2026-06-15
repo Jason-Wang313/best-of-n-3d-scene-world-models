@@ -1,0 +1,34 @@
+{
+  "all_passed": true,
+  "benchmark": "ModelNet10 tiny slice",
+  "candidate_counts": [
+    1,
+    4,
+    16,
+    64
+  ],
+  "categories": [
+    "chair",
+    "monitor"
+  ],
+  "claims": "C:\\Users\\wangz\\best-of-n-3d-scene-world-models\\results\\modelnet10_benchmark\\claims.json",
+  "figure": "C:\\Users\\wangz\\best-of-n-3d-scene-world-models\\figures\\figure10_modelnet10_benchmark.png",
+  "per_category": 8,
+  "proxy_axes": [
+    "x",
+    "y"
+  ],
+  "quick": false,
+  "sampler": {
+    "coherent_block_prob": 0.2,
+    "drift_prob": 0.03,
+    "faithful_prob": 0.85,
+    "hidden_fill_scale": 0.5,
+    "thin_shell_prob": 0.9,
+    "view_impostor_prob": 0.12
+  },
+  "seed": 2026,
+  "shape_count": 16,
+  "summary": "C:\\Users\\wangz\\best-of-n-3d-scene-world-models\\results\\modelnet10_benchmark\\modelnet10_summary.csv",
+  "trials": "C:\\Users\\wangz\\best-of-n-3d-scene-world-models\\results\\modelnet10_benchmark\\modelnet10_trials.csv"
+}

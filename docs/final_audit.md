@@ -6,12 +6,13 @@ Sparse-view candidate selection can amplify hidden-geometry errors in learned
 3D scene-world models because projective proxy scoring rewards observed-view
 agreement while ignoring underdetermined occupancy behind first-hit surfaces.
 
-## v3 contribution
+## v4 contribution
 
-This is no longer framed as a generic candidate-selection paper. The v3
+This is no longer framed as a generic candidate-selection paper. The v4
 manuscript is a geometry-specific view-impostor audit with visual-hull masks,
 hidden-region metrics, pool-size curves, repair ablations, calibration
-diagnostics, failure slices, and a real-system porting protocol.
+diagnostics, failure slices, a real-shape ModelNet10 benchmark tier, and a
+real-system porting protocol.
 
 ## Evidence split
 
@@ -21,6 +22,8 @@ diagnostics, failure slices, and a real-system porting protocol.
   candidate calibration, and failure cases.
 - `results/expansion/claims.json` passes after combining the replicated full
   benchmark with the compact stress suite.
+- `results/modelnet10_benchmark/claims.json` passes on a tiny ModelNet10-derived
+  chair/monitor voxel slice.
 
 ## Strongest replicated result
 
@@ -41,29 +44,38 @@ repair improves true IoU and gap, but also exposes remaining repaired failures.
 This stress suite is reported as diagnostic evidence, not as a replacement for
 the 72-scene replicated benchmark.
 
+## Real-shape benchmark result
+
+On the ModelNet10-derived chair/monitor slice, raw sparse-view selection raises
+proxy score by 0.167 from N=1 to N=64 while true 3D IoU drops by 0.130 and
+hidden-region IoU drops by 0.458. The coverage-aware reranker recovers 0.420
+true-IoU points over raw N=64 selection and reduces the exploitation gap by
+0.455.
+
 ## Biggest weaknesses
 
-- Synthetic voxel benchmark only.
+- Synthetic voxel benchmark remains the main replicated evidence.
 - Candidate mixture is simulated rather than produced by a trained NeRF, 3DGS,
   or occupancy world model.
 - Repair weights are heuristic.
 - The compact N=256 stress suite is small because high-pool replication was too
   slow for the available CPU budget.
-- Real neural-scene validation remains future work.
+- Full trained NeRF, 3DGS, and autonomous-driving occupancy validation remains
+  outside this scoped artifact.
 
 ## Paper-readiness judgment
 
-Submission-ready v3 as a scoped mechanism and audit paper. The paper is 25+
+Submission-ready v4 as a scoped mechanism and audit paper. The paper is 25+
 pages, explicitly avoids duplicate-wrapper framing, and keeps claims bounded to
-the evidence.
+the replicated synthetic, compact stress, and ModelNet10 real-shape evidence.
 
 ## Exact PDF paths
 
 Repository final:
-`C:\Users\wangz\best-of-n-3d-scene-world-models\paper\final\best-of-n-3d-scene-world-models-v3.pdf`
+`C:\Users\wangz\best-of-n-3d-scene-world-models\paper\final\best-of-n-3d-scene-world-models-v4.pdf`
 
 Desktop final:
-`C:\Users\wangz\OneDrive\Desktop\best-of-n-3d-scene-world-models-v3.pdf`
+`C:\Users\wangz\OneDrive\Desktop\best-of-n-3d-scene-world-models-v4.pdf`
 
 ## GitHub repo URL
 

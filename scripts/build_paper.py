@@ -9,8 +9,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PAPER_DIR = ROOT / "paper"
 FINAL_DIR = PAPER_DIR / "final"
-FINAL_PDF = FINAL_DIR / "best-of-n-3d-scene-world-models-v3.pdf"
-DESKTOP_PDF = Path.home() / "OneDrive" / "Desktop" / "best-of-n-3d-scene-world-models-v3.pdf"
+FINAL_PDF = FINAL_DIR / "best-of-n-3d-scene-world-models-v4.pdf"
+DESKTOP_PDF = Path.home() / "OneDrive" / "Desktop" / "best-of-n-3d-scene-world-models-v4.pdf"
 AUDIT = ROOT / "docs" / "final_audit.md"
 
 
@@ -47,7 +47,7 @@ def main() -> int:
                 )
                 (FINAL_DIR / "build_failure.txt").write_text(failure, encoding="utf-8")
                 _replace_audit_line(
-                    "Pending build: `C:\\Users\\wangz\\OneDrive\\Desktop\\best-of-n-3d-scene-world-models-v3.pdf`",
+                    "Pending build: `C:\\Users\\wangz\\OneDrive\\Desktop\\best-of-n-3d-scene-world-models-v4.pdf`",
                     "Build failed; see `paper/final/build_failure.txt`.",
                 )
                 print(failure)
@@ -61,7 +61,7 @@ def main() -> int:
         )
         (FINAL_DIR / "build_failure.txt").write_text(failure, encoding="utf-8")
         _replace_audit_line(
-            "Pending build: `C:\\Users\\wangz\\OneDrive\\Desktop\\best-of-n-3d-scene-world-models-v3.pdf`",
+            "Pending build: `C:\\Users\\wangz\\OneDrive\\Desktop\\best-of-n-3d-scene-world-models-v4.pdf`",
             "Build failed; see `paper/final/build_failure.txt`.",
         )
         print(failure)
@@ -78,8 +78,8 @@ def main() -> int:
     DESKTOP_PDF.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(built, DESKTOP_PDF)
     _replace_audit_line(
-        "Pending build: `C:\\Users\\wangz\\OneDrive\\Desktop\\best-of-n-3d-scene-world-models-v3.pdf`",
-        "`C:\\Users\\wangz\\OneDrive\\Desktop\\best-of-n-3d-scene-world-models-v3.pdf`",
+        "Pending build: `C:\\Users\\wangz\\OneDrive\\Desktop\\best-of-n-3d-scene-world-models-v4.pdf`",
+        "`C:\\Users\\wangz\\OneDrive\\Desktop\\best-of-n-3d-scene-world-models-v4.pdf`",
     )
     print(f"wrote {FINAL_PDF}")
     print(f"wrote {DESKTOP_PDF}")

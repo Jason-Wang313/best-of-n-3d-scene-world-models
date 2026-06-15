@@ -1,5 +1,5 @@
 {
-  "mode": "full-v3",
+  "mode": "full-stress",
   "main_grid": 20,
   "main_scenes": 4,
   "main_seeds": [

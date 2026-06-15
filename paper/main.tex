@@ -5,10 +5,10 @@
 \usepackage{amsthm}
 \usepackage{booktabs}
 \usepackage{graphicx}
-\usepackage{hyperref}
-\hypersetup{hidelinks}
-\usepackage{url}
 \usepackage{xcolor}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue!55!black,citecolor=green!45!black,urlcolor=blue!55!black}
+\usepackage{url}
 
 \title{View-Impostor Audits for Sparse-View\\3D Scene World Models}
 
@@ -43,7 +43,12 @@ from 0.520 to 0.340 and hidden-region error rises from 0.442 to 0.929. The
 reranker recovers much of the hidden geometry, reaching 0.851 true IoU at pool
 size 64. A compact high-pool stress suite extends the audit to pool size 256,
 view-axis sweeps, sampler-mixture shifts, hidden-mass shifts, repair ablations,
-candidate-level calibration, and failure slices. The contribution is not a new
+candidate-level calibration, and failure slices. A real-shape tier derived from
+ModelNet10 chair and monitor objects tests the same audit on recognized 3D
+object categories: sparse-view selection raises proxy score from 0.833 to
+1.000 while true 3D IoU drops from 0.574 to 0.445 and hidden-region IoU drops
+from 0.602 to 0.144; the reranker recovers true IoU to 0.865. The contribution
+is not a new
 renderer and not a universal claim about all neural scene systems. It is a
 submission-ready audit protocol for detecting when sparse-view selection is
 optimizing appearance while losing 3D consistency.
@@ -98,11 +103,12 @@ The paper has three design constraints. First, it must not be a duplicate
 wrapper around a generic candidate-selection theorem. The mechanism here is
 3D-specific: sparse views create hidden-geometry equivalence classes. Second,
 the claims must be narrow enough that a hostile reviewer cannot reject the
-paper for overclaiming beyond the synthetic evidence. Third, the evidence must
-be broader than a single curve. The v3 artifact therefore includes the original
-72-scene replicated run plus a compact high-pool stress suite that probes pool
-size 256, view-axis count, sampler mixture, hidden mass, repair components,
-candidate-level calibration, and remaining failure modes.
+paper for overclaiming beyond the available evidence. Third, the evidence must
+be broader than a single curve. The v4 artifact therefore includes the original
+72-scene replicated run, a compact high-pool stress suite that probes pool size
+256, view-axis count, sampler mixture, hidden mass, repair components,
+candidate-level calibration, remaining failure modes, and a ModelNet10-derived
+real-shape tier that checks the same mechanism on recognized object categories.
 
 The main results are:
 \begin{itemize}
@@ -117,6 +123,9 @@ The main results are:
   \item A compact pool-size-256 stress suite confirms proxy saturation at 1.000
   and shows that the repair still improves true IoU and gap, but also exposes
   harder cases where the reranker can still select impostors.
+  \item On the ModelNet10-derived real-shape tier, raw $N=64$ selection reaches
+  proxy 1.000 while true IoU drops to 0.445 and hidden IoU to 0.144; reranking
+  recovers true IoU to 0.865.
   \item Candidate-level calibration is weak globally: in the pool-size-256
   diagnostic set, the Pearson correlation between proxy score and true 3D IoU
   over all candidates is 0.476, and the Spearman correlation is 0.225.
@@ -276,7 +285,7 @@ visual hull. The surface term penalizes thin shell-like occupancy. No term uses
 hidden ground-truth voxels. The weights are fixed before evaluation and are
 kept deliberately simple so the repair is interpretable as an audit baseline.
 
-The v3 expansion also includes random selection, component ablations, a
+The compact expansion also includes random selection, component ablations, a
 consensus-only selector, and a volume/surface-only selector. These ablations do
 not attempt to optimize a final method. They answer a reviewer question: which
 parts of the repair are actually responsible for avoiding view impostors?
@@ -300,7 +309,7 @@ large datasets are stored.
 
 \subsection{Compact high-pool stress suite}
 
-The v3 expansion adds a compact suite targeted at specific failure angles. It
+The compact expansion adds a suite targeted at specific failure angles. It
 extends pool size to 256, probes one-axis, two-axis, and three-axis scoring,
 varies the prior probability of view-impostor candidates, varies hidden fill
 mass, ablates repair components, records candidate-level calibration, and saves
@@ -314,6 +323,22 @@ supports the main candidate-pool degradation claim. The pool-size-256 suite
 shows that the same proxy saturation and repair tradeoffs appear under more
 aggressive selection pressure, while also revealing that the repair is not
 fully solved at high pool sizes.
+
+\subsection{ModelNet10 real-shape tier}
+
+Controlled procedural scenes are useful for mechanism isolation, but a
+submission-ready audit should not stop there. The v4 artifact therefore adds a
+CPU-light real-shape tier derived from ModelNet10 \cite{wu20153d}. The
+committed slice contains 32-by-32-by-32 voxelized chair and monitor shapes,
+eight per category, stored under \texttt{data/modelnet10\_tiny}. The protocol
+uses seed 2026, pool sizes $N\in\{1,4,16,64\}$, the same sparse $x,y$ view
+scorer, and the same coverage-aware reranker as the synthetic benchmark.
+
+This tier is not a full ModelNet10 leaderboard, not a trained NeRF or 3DGS
+evaluation, and not a claim about deployment failure rates. Its purpose is
+more specific: check whether the audit still exposes view-impostor selection
+on recognized real object categories while keeping CPU and RAM usage low enough
+for deterministic regression testing.
 
 \subsection{Acceptance checks}
 
@@ -329,10 +354,15 @@ results directory. The audit passes only if:
   size;
   \item the repair beats random selection in the compact stress suite;
   \item candidate proxy score is not perfectly calibrated with true 3D IoU.
+  \item the ModelNet10 tier shows proxy increase from $N=1$ to $N=64$;
+  \item the ModelNet10 tier shows true-IoU and hidden-IoU degradation under
+  raw sparse-view selection;
+  \item the ModelNet10 reranker recovers true IoU and reduces exploitation
+  gap at high pool size.
 \end{itemize}
-The final repository audit also checks that the PDF exists under the v3 name,
-that the Desktop artifact exists, that stale version-two naming is absent from the
-manuscript, and that the final PDF has at least 25 pages.
+The final repository audit also checks that the PDF exists under the v4 name,
+that the Desktop artifact exists, that stale earlier final-artifact naming is
+absent from the manuscript, and that the final PDF has at least 25 pages.
 
 \section{Main Replicated Results}
 
@@ -446,7 +476,7 @@ stress result is different: by $N=16$ the sparse-view proxy has saturated at
 view-impostor mode. At $N=256$, reranking improves true IoU from 0.355 to 0.581
 and reduces the gap from 0.645 to 0.419, but it does not solve the problem.
 
-This is an important v3 change. The earlier paper could be read as implying
+This is an important scope correction. The earlier paper could be read as implying
 that the simple repair nearly fixes the mechanism. The high-pool stress suite
 shows a harder truth: the repair is strong at $N\leq 64$ in the replicated
 setting, but at $N=256$ it still selects view-impostor candidates in the compact
@@ -572,6 +602,53 @@ all candidates understates the danger if it is dominated by faithful or drift
 examples. The audit therefore reports both candidate-level calibration and
 selected-candidate outcomes.
 
+\section{ModelNet10 Real-Shape Benchmark}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.88\linewidth]{../figures/figure10_modelnet10_benchmark.png}
+  \caption{ModelNet10-derived real-shape tier. The same sparse-view audit is
+  run on chair and monitor voxel shapes. Raw selection optimizes the sparse
+  proxy while losing true and hidden 3D consistency; reranking recovers much of
+  the hidden structure without using hidden labels.}
+  \label{fig:modelnet}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{ModelNet10-derived chair/monitor tier with 16 real-shape targets.
+Values are means over eight chairs and eight monitors.}
+\label{tab:modelnet}
+\begin{tabular}{llrrrrr}
+\toprule
+method & $N$ & proxy & true IoU & hidden IoU & gap & impostor rate \\
+\midrule
+sparse-view & 1 & 0.833 & 0.574 & 0.602 & 0.259 & 0.188 \\
+sparse-view & 4 & 0.952 & 0.579 & 0.424 & 0.373 & 0.562 \\
+sparse-view & 16 & 1.000 & 0.445 & 0.144 & 0.555 & 0.938 \\
+sparse-view & 64 & 1.000 & 0.445 & 0.144 & 0.555 & 0.938 \\
+\midrule
+reranked & 64 & 0.965 & 0.865 & 0.785 & 0.101 & 0.250 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:modelnet} and Figure~\ref{fig:modelnet} test the audit outside
+purely procedural primitive scenes. The sparse-view selector again improves
+the deployed proxy while damaging global 3D consistency. From $N=1$ to $N=64$,
+proxy score rises by 0.167, true 3D IoU drops by 0.130, hidden-region IoU drops
+by 0.458, and the selected-impostor rate rises from 0.188 to 0.938. The
+coverage-aware reranker recovers true IoU by 0.420 at $N=64$ and reduces the
+exploitation gap by 0.455.
+
+The result should be read with the intended scope. It is a tiny, deterministic,
+CPU-light slice of ModelNet10, not a full category benchmark. The value is that
+the same failure mechanism survives contact with real object geometry and that
+the repository audit can rerun the tier quickly. A reviewer should not have to
+accept a synthetic-only story, but the paper still does not claim
+state-of-the-art ModelNet reconstruction or trained neural rendering
+performance.
+
 \section{Failure Cases}
 
 \begin{figure}[t]
@@ -660,9 +737,10 @@ surface complexity. Hidden target occupancy is used only for evaluation.
 
 \textbf{Attack: The synthetic scenes are too simple.}
 The scenes are simple by design. They isolate the mechanism and allow exact
-hidden-region measurement. The paper does not claim real NeRF, 3DGS, or
-autonomous-driving systems fail at the same rate. It provides a test that can
-be attached to those systems.
+hidden-region measurement. The v4 artifact also adds a small ModelNet10-derived
+chair/monitor tier so the evidence is not purely procedural. The paper still
+does not claim real NeRF, 3DGS, or autonomous-driving systems fail at the same
+rate. It provides a test that can be attached to those systems.
 
 \textbf{Attack: The repair is hand-tuned.}
 Correct. The repair is a fixed diagnostic baseline. The ablation section shows
@@ -677,12 +755,14 @@ adds high-pool stress, ablations, calibration, and failure analysis.
 
 \section{Limitations}
 
-The main limitation is external validity. The benchmark is synthetic, the
-candidate generator is simulated, and the projection proxy is a simplified
-silhouette/depth score. The results do not establish failure rates for real
-NeRF, Gaussian-splatting, point-cloud, or autonomous-driving occupancy systems.
-A real-system validation should attach the audit to a trained generator and
-evaluate with held-out 3D reconstructions or multi-view captures.
+The main limitation is external validity. The replicated backbone is synthetic,
+the candidate generator is simulated, and the projection proxy is a simplified
+silhouette/depth score. The ModelNet10-derived tier checks recognized
+chair/monitor geometry, but it is still a tiny CPU-light slice rather than a
+full trained NeRF, Gaussian-splatting, point-cloud, or autonomous-driving
+occupancy evaluation. A real-system validation should attach the audit to a
+trained generator and evaluate with held-out 3D reconstructions or multi-view
+captures.
 
 The second limitation is the repair. It is useful as an interpretable baseline
 but is not a final method. The high-pool stress run shows that it can still
@@ -707,15 +787,19 @@ python -m pytest
 python experiments/run_synthetic.py --preset smoke --output results/smoke
 python experiments/run_synthetic.py --preset full --output results/full
 python experiments/run_expansion_suite.py --mode full
+python -m experiments.run_modelnet10_benchmark
 python scripts/build_paper.py
 python scripts/run_claim_audit.py
 \end{verbatim}
 }
 All experiments are CPU-only and stream scene generation sequentially. The code
-does not require downloading datasets. The v3 expansion writes
+does not require downloading additional datasets; the tiny ModelNet10-derived
+slice is committed under \texttt{data/modelnet10\_tiny}. The compact expansion writes
 \texttt{expanded\_trials.csv}, \texttt{expanded\_summary.csv},
 \texttt{candidate\_diagnostics.csv}, \texttt{ablation\_summary.csv},
 \texttt{correlation\_summary.csv}, \texttt{failure\_cases.csv},
+\texttt{manifest.json}, and \texttt{claims.json}. The real-shape tier writes
+\texttt{modelnet10\_trials.csv}, \texttt{modelnet10\_summary.csv},
 \texttt{manifest.json}, and \texttt{claims.json}.
 
 \section{Conclusion}
@@ -758,7 +842,7 @@ voxels, and add a small fraction of nearby voxels. Drift candidates apply a
 larger translation and stronger noise. View-impostor candidates first compute
 the visible first-hit mask under the sparse axes, copy that visible surface,
 and then sample hidden material inside the visual hull. Most impostors are thin
-shells, while a minority receive coherent hidden blocks. The v3 sampler exposes
+shells, while a minority receive coherent hidden blocks. The audit sampler exposes
 configuration parameters for mixture probabilities, hidden fill scale, coherent
 block probability, and thin-shell probability.
 
@@ -863,12 +947,14 @@ view or mark the selection as unresolved rather than selecting a single scene.
 
 The paper claims that the mechanism exists in a controlled benchmark, that the
 replicated benchmark shows pool-size amplification under the sparse-view
-selector, that the repair reduces the gap in this benchmark, and that compact
-stress tests expose remaining high-pool weaknesses. It does not claim that all
-real neural scene systems exhibit the same failure rate. It does not claim the
-repair is optimal. It does not claim that proxy selection is always bad. If the
-proxy equals the true utility, or if the candidate generator never emits
-hidden-inconsistent projective equivalents, larger pools can help.
+selector, that the repair reduces the gap in this benchmark, that compact
+stress tests expose remaining high-pool weaknesses, and that a tiny
+ModelNet10-derived chair/monitor tier shows the same audited pattern on
+recognized object categories. It does not claim that all real neural scene
+systems exhibit the same failure rate. It does not claim the repair is optimal.
+It does not claim that proxy selection is always bad. If the proxy equals the
+true utility, or if the candidate generator never emits hidden-inconsistent
+projective equivalents, larger pools can help.
 
 The most important reviewer-facing boundary is the difference between a
 mechanism audit and a deployment measurement. A deployment measurement would
@@ -880,12 +966,14 @@ logic and controlled evidence needed before that larger evaluation.
 
 \textbf{Anonymous submission.} The manuscript uses anonymous author metadata.
 
-\textbf{Claims.} Claims are scoped to the synthetic benchmark and the
-construction-level mechanism. The paper explicitly separates replicated claims
-from compact stress diagnostics.
+\textbf{Claims.} Claims are scoped to the replicated synthetic benchmark, the
+compact stress diagnostics, the tiny ModelNet10-derived real-shape tier, and
+the construction-level mechanism. The paper explicitly separates replicated
+claims from compact stress diagnostics and avoids deployment-rate claims.
 
-\textbf{Code and data.} All benchmark code is included. Data are procedurally
-generated from deterministic seeds.
+\textbf{Code and data.} All benchmark code is included. Synthetic data are
+procedurally generated from deterministic seeds, and the tiny ModelNet10-derived
+chair/monitor slice is committed for deterministic reruns.
 
 \textbf{Compute.} Experiments run on CPU. The replicated benchmark uses 72
 scenes and grid size 24. The high-pool stress suite is compact and sequential
@@ -1151,8 +1239,9 @@ Classical geometry already knows sparse views are ambiguous. &
 Correct. The novelty is the candidate-selection audit and measured pool-size
 amplification, not the ambiguity itself. \\
 The benchmark is synthetic. &
-Correct. It is a mechanism benchmark. The paper does not claim real-system
-failure rates and gives a porting protocol. \\
+Correct for the replicated backbone. The v4 artifact also includes a tiny
+ModelNet10-derived real-shape tier, does not claim real-system failure rates,
+and gives a porting protocol. \\
 The candidate generator includes impostors. &
 Correct. The audit tests whether selection finds that failure mode as pool
 size grows. \\
@@ -1216,9 +1305,9 @@ The key generated files are:
   \item \texttt{results/full/summary.csv}: replicated 72-scene aggregate
   metrics up to pool size 64.
   \item \texttt{results/full/metrics.csv}: per-scene replicated metrics.
-  \item \texttt{results/expansion/expanded\_summary.csv}: compact v3 stress
+  \item \texttt{results/expansion/expanded\_summary.csv}: compact stress
   aggregate metrics.
-  \item \texttt{results/expansion/expanded\_trials.csv}: per-trial v3 stress
+  \item \texttt{results/expansion/expanded\_trials.csv}: per-trial compact stress
   metrics.
   \item \texttt{results/expansion/candidate\_diagnostics.csv}: candidate-level
   proxy, repair, and true IoU diagnostics.
@@ -1227,13 +1316,19 @@ The key generated files are:
   \item \texttt{results/expansion/failure\_cases.csv}: worst repaired
   high-pool selections.
   \item \texttt{results/expansion/claims.json}: machine-readable claim audit.
-  \item \texttt{paper/final/best-of-n-3d-scene-world-models-v3.pdf}: final
+  \item \texttt{results/modelnet10\_benchmark/modelnet10\_summary.csv}: real-shape
+  chair/monitor aggregate metrics.
+  \item \texttt{results/modelnet10\_benchmark/modelnet10\_trials.csv}: per-shape
+  real-shape benchmark metrics.
+  \item \texttt{results/modelnet10\_benchmark/claims.json}: machine-readable
+  real-shape claim audit.
+  \item \texttt{paper/final/best-of-n-3d-scene-world-models-v4.pdf}: final
   repository PDF.
 \end{itemize}
 
 The paper figures are generated into \texttt{figures/} and copied into the
 expansion results directory for self-contained inspection. The build script
-copies the final v3 PDF to the Desktop under the same v3 filename.
+copies the final v4 PDF to the Desktop under the same v4 filename.
 
 \section{Appendix N: Why This Paper Is Not a Duplicate Wrapper}
 
@@ -1382,7 +1477,7 @@ paper:
 \begin{enumerate}
   \item Is the title distinct from generic candidate-selection papers? Yes.
   \item Does the abstract name the 3D mechanism? Yes.
-  \item Are claims scoped to synthetic evidence? Yes.
+  \item Are claims scoped to synthetic and tiny real-shape evidence? Yes.
   \item Is classical visual hull work acknowledged? Yes.
   \item Is proxy overoptimization prior work acknowledged? Yes.
   \item Does the paper avoid claiming a new renderer? Yes.
@@ -1404,7 +1499,7 @@ paper:
   \item Is compute described? Yes.
   \item Are deterministic seeds used? Yes.
   \item Is the final PDF built by script? Yes.
-  \item Is the Desktop artifact named v3? Yes.
+  \item Is the Desktop artifact named v4? Yes.
   \item Is the source folder the source of truth? Yes.
   \item Are stale version-two names excluded from the manuscript? Yes.
   \item Is there a machine-readable claim audit? Yes.
@@ -1434,13 +1529,15 @@ paper:
 
 \section{Appendix S: Additional Discussion of Compute Constraints}
 
-The v3 pass attempted larger high-pool stress configurations, but pure Python
+The previous pass attempted larger high-pool stress configurations, but pure Python
 scoring at $N=256$ over many scenes was too slow on the available machine while
 other background experiments were active. Rather than hide this, the final
 artifact makes the engineering choice explicit. The replicated 72-scene
 benchmark remains the main quantitative result. The high-pool suite is compact
 but covers more adversarial axes: pool size 256, axis count, mixture shift,
-hidden fill, ablation, calibration, and failures. This is the correct
+hidden fill, ablation, calibration, and failures. The v4 artifact adds a tiny
+ModelNet10-derived real-shape tier without raising CPU or RAM requirements
+enough to make reruns fragile. This is the correct
 submission stance because it maximizes rigor under the actual compute budget
 without pretending that a small stress suite has the confidence of a large
 benchmark.
@@ -1547,7 +1644,7 @@ setting only. If the repair is heuristic, report it as a baseline. This
 discipline is what keeps the audit useful rather than becoming another
 overbroad candidate-selection story.
 
-\begin{thebibliography}{20}
+\begin{thebibliography}{21}
 
 \bibitem[Mildenhall et~al.(2020)]{mildenhall2020nerf}
 Mildenhall, B., Srinivasan, P., Tancik, M., Barron, J., Ramamoorthi, R., and Ng, R.
@@ -1620,6 +1717,10 @@ Training verifiers to solve math word problems. arXiv, 2021.
 \bibitem[Lightman et~al.(2023)]{lightman2023verify}
 Lightman, H. et al.
 Let's verify step by step. ICLR, 2023.
+
+\bibitem[Wu et~al.(2015)]{wu20153d}
+Wu, Z., Song, S., Khosla, A., Yu, F., Zhang, L., Tang, X., and Xiao, J.
+3D ShapeNets: A deep representation for volumetric shapes. CVPR, 2015.
 
 \bibitem[Laurentini(1994)]{laurentini1994visual}
 Laurentini, A.
