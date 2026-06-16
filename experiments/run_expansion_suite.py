@@ -8,7 +8,7 @@ import sys
 from typing import Iterable, Sequence
 
 import matplotlib
-matplotlib.use("Agg")
+matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd

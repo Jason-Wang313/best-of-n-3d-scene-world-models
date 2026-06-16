@@ -29,7 +29,7 @@ def main() -> int:
     FINAL_DIR.mkdir(parents=True, exist_ok=True)
     command = ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", "main.tex"]
     try:
-        for _ in range(2):
+        for _ in range(3):
             completed = subprocess.run(
                 command,
                 cwd=PAPER_DIR,
@@ -77,6 +77,7 @@ def main() -> int:
     shutil.copyfile(built, FINAL_PDF)
     DESKTOP_PDF.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(built, DESKTOP_PDF)
+    built.unlink(missing_ok=True)
     _replace_audit_line(
         "Pending build: `C:\\Users\\wangz\\OneDrive\\Desktop\\best-of-n-3d-scene-world-models-v4.pdf`",
         "`C:\\Users\\wangz\\OneDrive\\Desktop\\best-of-n-3d-scene-world-models-v4.pdf`",
