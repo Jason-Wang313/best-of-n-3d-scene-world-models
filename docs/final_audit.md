@@ -83,13 +83,13 @@ https://github.com/Jason-Wang313/best-of-n-3d-scene-world-models
 
 ## Final v4 provenance
 
-- Verified on: 2026-06-16
+- Verified on: 2026-06-19
 - Final PDF SHA256:
-  `78E4E2D0017097A054E5DB794E2BCEBACFBBC9B3F502D6D283A43D1E8BBF3C80`
+  `9293CC720A385F3732EF3E7C7743675326516F1A5AA89A3FDE4B3714EB6C778D`
 - Final page count: 27
 - Repository and Desktop PDFs have matching hashes.
 - Checks passed: `python -m compileall src experiments scripts tests -q`;
   `python -m pytest -q` with 8 tests; full expansion rerun;
   `python scripts\run_claim_audit.py`; LaTeX warning scan; full-PDF PNG
   render.
-- Visual QA inspected pages 1, 5, 10, 16, 23, and 27.
+- Visual QA inspected pages 1, 5, 6, 8, 10, 11, 12, 16, 23, and 27.

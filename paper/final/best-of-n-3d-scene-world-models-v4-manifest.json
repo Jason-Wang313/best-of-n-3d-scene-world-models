@@ -4,9 +4,9 @@
   "github_remote": "https://github.com/Jason-Wang313/best-of-n-3d-scene-world-models.git",
   "repository_pdf": "paper/final/best-of-n-3d-scene-world-models-v4.pdf",
   "desktop_pdf": "C:\\Users\\wangz\\OneDrive\\Desktop\\best-of-n-3d-scene-world-models-v4.pdf",
-  "sha256": "78E4E2D0017097A054E5DB794E2BCEBACFBBC9B3F502D6D283A43D1E8BBF3C80",
+  "sha256": "9293CC720A385F3732EF3E7C7743675326516F1A5AA89A3FDE4B3714EB6C778D",
   "pages": 27,
-  "verified_on": "2026-06-16",
+  "verified_on": "2026-06-19",
   "checks": {
     "compileall": "passed",
     "pytest": "8 passed",
@@ -15,6 +15,6 @@
     "latex_final_log_scan": "passed",
     "repo_desktop_hash_match": true,
     "pdf_render": "all 27 pages rendered",
-    "visual_qa": "pages 1, 5, 10, 16, 23, and 27 inspected"
+    "visual_qa": "pages 1, 5, 6, 8, 10, 11, 12, 16, 23, and 27 inspected"
   }
 }
